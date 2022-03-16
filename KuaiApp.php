@@ -26,6 +26,9 @@ class KuaiApp extends \owoframe\application\AppBase
 {
 	public function initialize() : void
 	{
+		if(!defined('SAVE_PATH')) {
+			define('SAVE_PATH', STORAGE_PATH . 'kuaiApp' . DIRECTORY_SEPARATOR); // 默认将解析到的作品资源保存在框架的资源存储文件目录下;
+		}
 		$this->setDefaultController('Kuai');
 		MasterManager::getInstance()->getManager('console')->registerCommand(KuaiCommand::getName(), new KuaiCommand());
 	}
