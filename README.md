@@ -17,7 +17,7 @@
 > ### 作者作品全解析的使用方法:
 1. 打开快手官网并登录你的账号.
 2. 搜索你想保存的作者名称, 点击加载完成页面后打开浏览器控制台 (F12).
-3. 注入 `Javascript` 代码 ([点我](https://github.com/Tommy131/KuaishouParser/blob/main/static/js/KuaishouParser.js))
+3. 注入 `Javascript` 代码 ([点我](/static/js/KuaishouParser.js))
 4. 等待运行结束, 最终抓取到的地址将会通过 `POST` 请求提交到本App进行保存.
 5. 在 `CMD` 或 `任意终端` 中输入指令 `php owo kuai file [作者ID]` 进行资源地址批量下载.
 6. 若资源解析成功, 在 `Windows系统` 中将会自动打开保存的文件目录.
