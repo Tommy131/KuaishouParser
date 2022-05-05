@@ -18,7 +18,7 @@
 namespace application\kuai\command;
 
 use owoframe\helper\Helper;
-use owoframe\exception\OwOExpection;
+use owoframe\exception\OwOFrameException;
 use owoframe\utils\{Curl, Logger};
 
 class KuaiCommand extends \owoframe\console\CommandBase
@@ -26,7 +26,7 @@ class KuaiCommand extends \owoframe\console\CommandBase
 	public function execute(array $params) : bool
 	{
 		if(!defined('SAVE_PATH')) {
-			throw new OwOExpection('缺失常量定义: SAVE_PATH');
+			throw new OwOFrameException('缺失常量定义: SAVE_PATH');
 		}
 		$savePath = SAVE_PATH;
 

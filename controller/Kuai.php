@@ -51,7 +51,7 @@ class Kuai extends \owoframe\application\ControllerBase
 			return '无效的请求格式.';
 		}
 
-		$basePath = dirname(__DIR__) . DIRECTORY_SEPARATOR . 'saves' . DIRECTORY_SEPARATOR . $userId . DIRECTORY_SEPARATOR;
+		$basePath = SAVE_PATH . $userId . DIRECTORY_SEPARATOR;
 		if(!is_dir($basePath)) {
 			mkdir($basePath, 777, true);
 		}
