@@ -19,7 +19,7 @@ namespace application\kuai\command;
 
 use owoframe\helper\Helper;
 use owoframe\exception\OwOFrameException;
-use owoframe\utils\{Curl, Logger};
+use owoframe\utils\Curl;
 
 class KuaiCommand extends \owoframe\console\CommandBase
 {
@@ -34,22 +34,22 @@ class KuaiCommand extends \owoframe\console\CommandBase
 			$authorId = array_shift($params);
 			$authorId = array_shift($params);
 			if(!is_string($authorId)) {
-				Logger::info('请输入一个有效的AuthorID. 用法: ' . self::getUsage() . ' file [string:AuthorId]');
+				$this->getLogger()->info('请输入一个有效的AuthorID. 用法: ' . self::getUsage() . ' file [string:AuthorId]');
 				return false;
 			}
 			$outputPath = $savePath . $authorId . DIRECTORY_SEPARATOR;
 			if(is_dir($outputPath)) {
 				$list = file_get_contents($outputPath . 'serialized.txt');
 				if(!is_serialized($list)) {
-					Logger::error('文件格式错误, 请确认文件数据是否已经标准序列化.');
+					$this->getLogger()->error('文件格式错误, 请确认文件数据是否已经标准序列化.');
 					return true;
 				}
 				$list = (array) unserialize($list);
 
-				Logger::success('文件加载成功! 总共获取到 ' . count($list) . ' 个作品, 即将进行下载请求...');
+				$this->getLogger()->success('文件加载成功! 总共获取到 ' . count($list) . ' 个作品, 即将进行下载请求...');
 				foreach($list as $id => $item) {
 					if(is_array($item)) {
-						Logger::notice('正在请求下载作品 [' . $id . '] ...');
+						$this->getLogger()->notice('正在请求下载作品 [' . $id . '] ...');
 						foreach($item as $url) {
 							$this->saveFile($url, $outputPath . $id . DIRECTORY_SEPARATOR);
 							usleep(1500);
@@ -62,27 +62,27 @@ class KuaiCommand extends \owoframe\console\CommandBase
 				if(Helper::getOS() === Helper::OS_WINDOWS) {
 					system('start ' . $outputPath);
 				}
-				Logger::success("操作成功完成, 已将 '" . count($list) . "' 个作品保存在目录 '{$outputPath}' 下.");
+				$this->getLogger()->success("操作成功完成, 已将 '" . count($list) . "' 个作品保存在目录 '{$outputPath}' 下.");
 			} else {
-				Logger::error('不存在该文件夹, 无法执行操作.');
+				$this->getLogger()->error('不存在该文件夹, 无法执行操作.');
 			}
 			return true;
 		}
 
 		$shareId = array_shift($params);
 		if(empty($shareId)) {
-			Logger::info('请输入一个有效的分享ID. 用法: ' . self::getUsage() . ' [string:shareId] [int:mode[0|1]');
+			$this->getLogger()->info('请输入一个有效的分享ID. 用法: ' . self::getUsage() . ' [string:shareId] [int:mode[0|1]');
 			return false;
 		}
 
 		$baseUrl  = 'https://live.kuaishou.com/u/';
-		// $shareUrl = 'https://v.kuaishou.com/s/';
-		$shareUrl = 'https://v.kuaishouapp.com/s/';
+		$shareUrl = 'https://v.kuaishou.com/';
+		// $shareUrl = 'https://v.kuaishouapp.com/';
 
 
 		$ip = Curl::getRadomIp();
 		$newCurl = function($ip, int $mode = 1) {
-			Logger::info('已选择UA: ' . (($mode === 1) ? 'PC' : 'Mobile'));
+			$this->getLogger()->info('已选择UA: ' . (($mode === 1) ? 'PC' : 'Mobile'));
 			$mobile = 'Mozilla/5.0 (iPhone; CPU iPhone OS 10_3_1 like Mac OS X) AppleWebKit/603.1.30 (KHTML, like Gecko) Version/10.0 Mobile/14E304 Safari/602.1 Edg/98.0.4758.102';
 			$pc     = 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/98.0.4758.102 Safari/537.36 Edg/98.0.1108.62';
 			$_      = (new Curl())->setUA(($mode === 0) ? $mobile : $pc)->returnBody(true)->returnHeader(true);
@@ -94,7 +94,7 @@ class KuaiCommand extends \owoframe\console\CommandBase
 			return $_;
 		};
 
-		Logger::info("正在解析分享ID: [shareId={$shareId}]");
+		$this->getLogger()->info("正在解析分享ID: [shareId={$shareId}]");
 		$mode    = array_shift($params) ?? 1;
 		$curl    = $newCurl($ip, $mode)->setUrl($shareUrl . $shareId)->exec();
 		$result  = curl_getinfo($curl->getResource());
@@ -104,19 +104,25 @@ class KuaiCommand extends \owoframe\console\CommandBase
 			$data = parse_url($result['redirect_url']);
 			$data = $data['query'] ?? null;
 			if(is_null($data)) {
-				Logger::error("分享ID [shareId={$shareId}] 无效!");
+				$this->getLogger()->error("分享ID [shareId={$shareId}] 无效!");
 				return true;
 			}
+			// $this->getLogger()->debug('Raw Url: ' . $result['redirect_url']);
 			parse_str($data, $params);
 			$url  = $baseUrl . $params['userId'] . '/' . $params['photoId'] . '?' . $data;
-			Logger::success("解析成功~ 用户ID: {$params['userId']} | 图片集作品ID: {$params['photoId']}");
-			Logger::debug("解析地址: {$url}");
+			$this->getLogger()->success("解析成功~ 用户ID: {$params['userId']} | 图片集作品ID: {$params['photoId']}");
+			$this->getLogger()->debug("解析地址: {$url}");
 			if(ask('是否继续执行下载操作?', 'Y', 'warning') !== 'Y') {
-				Logger::info('已终止.');
+				$this->getLogger()->info('已终止.');
 				return true;
 			}
-			Logger::notice("解析成功, 正在尝试获取目标图床, 此操作过程预计在10分钟以内完成, 请耐心等待...");
-			$page = file_get_contents($url);
+			$this->getLogger()->notice("解析成功, 正在尝试获取目标图床, 此操作过程预计在10分钟以内完成, 请耐心等待...");
+			// $page = file_get_contents($url);
+			$page = $newCurl($ip, $mode)->setUrl($url)->exec()->getContent();
+			if(!$page) {
+				$this->getLogger()->error("解析失败, 可能请求超时, 请稍后重试.");
+				return true;
+			}
 			// var_dump($page);exit;
 			$outputPath = $savePath . $params['userId'] . DIRECTORY_SEPARATOR . $params['photoId'] . DIRECTORY_SEPARATOR;
 			$count = 0;
@@ -152,15 +158,15 @@ class KuaiCommand extends \owoframe\console\CommandBase
 					}
 				}
 			} else {
-				Logger::error('无法匹配到任何资源.');
+				$this->getLogger()->error('无法匹配到任何资源.');
 			}
 			if($count > 0) {
-				Logger::success("操作成功完成, 已将 '{$count}' 个文件保存在目录 '{$outputPath}' 下.");
+				$this->getLogger()->success("操作成功完成, 已将 '{$count}' 个文件保存在目录 '{$outputPath}' 下.");
 				if(Helper::getOS() === Helper::OS_WINDOWS) {
 					system('start ' . $outputPath);
 				}
 			} else {
-				Logger::warning('文件保存失败, 尝试使用移动UA [mode=0] 有几率能够成功解析资源地址.');
+				$this->getLogger()->warning('文件保存失败, 尝试使用移动UA [mode=0] 有几率能够成功解析资源地址.');
 			}
 		}
 		return true;
@@ -173,15 +179,15 @@ class KuaiCommand extends \owoframe\console\CommandBase
 		}
 		$saveName = explode('/', parse_url($url)['path']);
 		$saveName = end($saveName);
-		Logger::info('正在保存文件: ' . $outputPath . $saveName);
-		Logger::info('来自远程URL: ' . $url);
+		$this->getLogger()->info('正在保存文件: ' . $outputPath . $saveName);
+		$this->getLogger()->info('来自远程URL: ' . $url);
 		if(is_file($outputPath . $saveName)) {
-			Logger::notice('文件已存在, 跳过下载.');
+			$this->getLogger()->notice('文件已存在, 跳过下载.');
 			return true;
 		}
 		@file_put_contents($outputPath . $saveName, file_get_contents($url));
 		if(!is_file($outputPath . $saveName)) {
-			Logger::error('文件下载失败!');
+			$this->getLogger()->error('文件下载失败!');
 			return false;
 		} else {
 			return true;

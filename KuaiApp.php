@@ -27,10 +27,10 @@ class KuaiApp extends \owoframe\application\AppBase
 	public function initialize() : void
 	{
 		if(!defined('SAVE_PATH')) {
-			define('SAVE_PATH', STORAGE_PATH . 'kuaiApp' . DIRECTORY_SEPARATOR); // 默认将解析到的作品资源保存在框架的资源存储文件目录下;
+			define('SAVE_PATH', STORAGE_A_PATH . 'kuaiApp' . DIRECTORY_SEPARATOR); // 默认将解析到的作品资源保存在框架的资源存储文件目录下;
 		}
 		$this->setDefaultController('Kuai');
-		MasterManager::getInstance()->getManager('console')->registerCommand(KuaiCommand::getName(), new KuaiCommand());
+		MasterManager::getInstance()->getUnit('console')->registerCommand(KuaiCommand::getName(), KuaiCommand::class);
 	}
 
 	public static function isCLIOnly() : bool
@@ -55,7 +55,7 @@ class KuaiApp extends \owoframe\application\AppBase
 
 	public static function getDescription() : string
 	{
-		return '快手API';
+		return '快手作品解析后端';
 	}
 }
 ?>

@@ -18,9 +18,6 @@
 
 namespace application\kuai\controller;
 
-use owoframe\helper\Helper;
-use owoframe\utils\Curl;
-
 class Kuai extends \owoframe\application\ControllerBase
 {
 	public function __construct()
