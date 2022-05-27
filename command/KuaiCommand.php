@@ -47,7 +47,15 @@ class KuaiCommand extends \owoframe\console\CommandBase
 				$list = (array) unserialize($list);
 
 				$this->getLogger()->success('文件加载成功! 总共获取到 ' . count($list) . ' 个作品, 即将进行下载请求...');
+
+
+
+				$process = '';
+				$current = 0;
+				$end = count($list);
+
 				foreach($list as $id => $item) {
+					$current++;
 					if(is_array($item)) {
 						$this->getLogger()->notice('正在请求下载作品 [' . $id . '] ...');
 						foreach($item as $url) {
@@ -58,7 +66,20 @@ class KuaiCommand extends \owoframe\console\CommandBase
 						$this->saveFile($item, $outputPath);
 						usleep(1500);
 					}
+
+					$process .= '▊';
+					$percent = round($current / $end * 100);
+					if($percent <= 100) {
+						echo "\033[?25l"; // 隐藏光标
+						echo "\033[32m{$process}\033[33m {$percent}%";
+						echo "\033[-105D"; // 移动光标到行首
+						echo "\n\n";
+					}
+					if($percent == 100) {
+						echo "\n\33[?25h"; // 显示光标
+					}
 				}
+
 				if(Helper::getOS() === Helper::OS_WINDOWS) {
 					system('start ' . $outputPath);
 				}
@@ -179,8 +200,8 @@ class KuaiCommand extends \owoframe\console\CommandBase
 		}
 		$saveName = explode('/', parse_url($url)['path']);
 		$saveName = end($saveName);
-		$this->getLogger()->info('正在保存文件: ' . $outputPath . $saveName);
-		$this->getLogger()->info('来自远程URL: ' . $url);
+		// $this->getLogger()->info('正在保存文件: ' . $outputPath . $saveName);
+		// $this->getLogger()->info('来自远程URL: ' . $url);
 		if(is_file($outputPath . $saveName)) {
 			$this->getLogger()->notice('文件已存在, 跳过下载.');
 			return true;
