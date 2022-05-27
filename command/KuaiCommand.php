@@ -81,7 +81,7 @@ class KuaiCommand extends \owoframe\console\CommandBase
 
 
 		$ip = Curl::getRadomIp();
-		$newCurl = function($ip, int $mode = 1) {
+		$newCurl = function(int $mode = 1) use ($ip) {
 			$this->getLogger()->info('已选择UA: ' . (($mode === 1) ? 'PC' : 'Mobile'));
 			$mobile = 'Mozilla/5.0 (iPhone; CPU iPhone OS 10_3_1 like Mac OS X) AppleWebKit/603.1.30 (KHTML, like Gecko) Version/10.0 Mobile/14E304 Safari/602.1 Edg/98.0.4758.102';
 			$pc     = 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/98.0.4758.102 Safari/537.36 Edg/98.0.1108.62';
@@ -96,7 +96,7 @@ class KuaiCommand extends \owoframe\console\CommandBase
 
 		$this->getLogger()->info("正在解析分享ID: [shareId={$shareId}]");
 		$mode    = array_shift($params) ?? 1;
-		$curl    = $newCurl($ip, $mode)->setUrl($shareUrl . $shareId)->exec();
+		$curl    = $newCurl($mode)->setUrl($shareUrl . $shareId)->exec();
 		$result  = curl_getinfo($curl->getResource());
 		// var_dump($curl->getContent());exit;
 
@@ -118,7 +118,7 @@ class KuaiCommand extends \owoframe\console\CommandBase
 			}
 			$this->getLogger()->notice("解析成功, 正在尝试获取目标图床, 此操作过程预计在10分钟以内完成, 请耐心等待...");
 			// $page = file_get_contents($url);
-			$page = $newCurl($ip, $mode)->setUrl($url)->exec()->getContent();
+			$page = $newCurl($mode)->setUrl($url)->exec()->getContent();
 			if(!$page) {
 				$this->getLogger()->error("解析失败, 可能请求超时, 请稍后重试.");
 				return true;
