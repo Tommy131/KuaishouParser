@@ -20,6 +20,7 @@ namespace application\kuai\command;
 use owoframe\helper\Helper;
 use owoframe\exception\OwOFrameException;
 use owoframe\utils\Curl;
+use owoframe\utils\TextFormat;
 
 class KuaiCommand extends \owoframe\console\CommandBase
 {
@@ -44,46 +45,35 @@ class KuaiCommand extends \owoframe\console\CommandBase
 					$this->getLogger()->error('文件格式错误, 请确认文件数据是否已经标准序列化.');
 					return true;
 				}
-				$list = (array) unserialize($list);
+				$list  = (array) unserialize($list);
+				$total = count($list);
 
-				$this->getLogger()->success('文件加载成功! 总共获取到 ' . count($list) . ' 个作品, 即将进行下载请求...');
+				$this->getLogger()->info('文件加载成功! 总共获取到 ' . $total . ' 个作品, 即将进行下载请求...');
 
-
-
-				$process = '';
 				$current = 0;
-				$end = count($list);
-
+				TextFormat::sendClear();
 				foreach($list as $id => $item) {
-					$current++;
-					if(is_array($item)) {
-						$this->getLogger()->notice('正在请求下载作品 [' . $id . '] ...');
-						foreach($item as $url) {
-							$this->saveFile($url, $outputPath . $id . DIRECTORY_SEPARATOR);
-							usleep(1500);
-						}
-					} else {
-						$this->saveFile($item, $outputPath);
+					++$current;
+					TextFormat::sendProgressBar($current, $total, "[{$current}/{$total}] 正在请求下载作品 '{$id}'...", function() use ($item, $outputPath, $id) {
 						usleep(1500);
-					}
-
-					$process .= '▊';
-					$percent = round($current / $end * 100);
-					if($percent <= 100) {
-						echo "\033[?25l"; // 隐藏光标
-						echo "\033[32m{$process}\033[33m {$percent}%";
-						echo "\033[-105D"; // 移动光标到行首
-						echo "\n\n";
-					}
-					if($percent == 100) {
-						echo "\n\33[?25h"; // 显示光标
-					}
+						$result = ['status' => null, 'message' => ''];
+						if(is_array($item)) {
+							foreach($item as $url) {
+								$result['status'] = $this->saveFile($url, $outputPath . $id . DIRECTORY_SEPARATOR);
+								$result['message'] = "作品ID '{$id}' 保存成功!";
+							}
+						} else {
+							$result['status'] = $this->saveFile($item, $outputPath);
+							$result['message'] = "作品ID '{$id}' 保存失败!";
+						}
+						return $result;
+					});
 				}
 
 				if(Helper::getOS() === Helper::OS_WINDOWS) {
 					system('start ' . $outputPath);
 				}
-				$this->getLogger()->success("操作成功完成, 已将 '" . count($list) . "' 个作品保存在目录 '{$outputPath}' 下.");
+				$this->getLogger()->success("操作成功完成, 已将 '{$total}' 个作品保存在目录 '{$outputPath}' 下.");
 			} else {
 				$this->getLogger()->error('不存在该文件夹, 无法执行操作.');
 			}
@@ -203,12 +193,12 @@ class KuaiCommand extends \owoframe\console\CommandBase
 		// $this->getLogger()->info('正在保存文件: ' . $outputPath . $saveName);
 		// $this->getLogger()->info('来自远程URL: ' . $url);
 		if(is_file($outputPath . $saveName)) {
-			$this->getLogger()->notice('文件已存在, 跳过下载.');
+			// $this->getLogger()->notice('文件已存在, 跳过下载.');
 			return true;
 		}
 		@file_put_contents($outputPath . $saveName, file_get_contents($url));
 		if(!is_file($outputPath . $saveName)) {
-			$this->getLogger()->error('文件下载失败!');
+			// $this->getLogger()->error('文件下载失败!');
 			return false;
 		} else {
 			return true;
