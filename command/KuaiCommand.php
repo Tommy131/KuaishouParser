@@ -80,34 +80,33 @@ class KuaiCommand extends \owoframe\console\CommandBase
 			return true;
 		}
 
-		$shareId = array_shift($params);
+		// 下列方法已失效! 2022-06-11
+		/* $shareId = array_shift($params);
 		if(empty($shareId)) {
-			$this->getLogger()->info('请输入一个有效的分享ID. 用法: ' . self::getUsage() . ' [string:shareId] [int:mode[0|1]');
+			$this->getLogger()->info('请输入一个有效的分享ID. 用法: ' . self::getUsage() . ' [string:shareId]');
 			return false;
 		}
 
 		$baseUrl  = 'https://live.kuaishou.com/u/';
-		$shareUrl = 'https://v.kuaishou.com/';
-		// $shareUrl = 'https://v.kuaishouapp.com/';
+		$shareUrl = 'https://v.kuaishou.com/s/';
+		// $shareUrl = 'https://v.kuaishouapp.com/s/';
 
 
 		$ip = Curl::getRadomIp();
-		$newCurl = function(int $mode = 1) use ($ip) {
-			$this->getLogger()->info('已选择UA: ' . (($mode === 1) ? 'PC' : 'Mobile'));
-			$mobile = 'Mozilla/5.0 (iPhone; CPU iPhone OS 10_3_1 like Mac OS X) AppleWebKit/603.1.30 (KHTML, like Gecko) Version/10.0 Mobile/14E304 Safari/602.1 Edg/98.0.4758.102';
+		$newCurl = function() use ($ip) {
 			$pc     = 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/98.0.4758.102 Safari/537.36 Edg/98.0.1108.62';
-			$_      = (new Curl())->setUA(($mode === 0) ? $mobile : $pc)->returnBody(true)->returnHeader(true);
+			$_      = (new Curl())->setUA( $pc)->returnBody(true)->returnHeader(true);
 			$_->setHeader([
 				'CLIENT-IP: ' . $ip,
-				'X-FORWARDED-FOR: ' . $ip
+				'X-FORWARDED-FOR: ' . $ip,
+				'User-Agent: ' . $pc
 			]);
-			ini_set('user_agent', ($mode === 0) ? $mobile : $pc);
+			ini_set('user_agent', $pc);
 			return $_;
 		};
 
 		$this->getLogger()->info("正在解析分享ID: [shareId={$shareId}]");
-		$mode    = array_shift($params) ?? 1;
-		$curl    = $newCurl($mode)->setUrl($shareUrl . $shareId)->exec();
+		$curl    = $newCurl()->setUrl($shareUrl . $shareId)->exec();
 		$result  = curl_getinfo($curl->getResource());
 		// var_dump($curl->getContent());exit;
 
@@ -121,15 +120,15 @@ class KuaiCommand extends \owoframe\console\CommandBase
 			// $this->getLogger()->debug('Raw Url: ' . $result['redirect_url']);
 			parse_str($data, $params);
 			$url  = $baseUrl . $params['userId'] . '/' . $params['photoId'] . '?' . $data;
-			$this->getLogger()->success("解析成功~ 用户ID: {$params['userId']} | 图片集作品ID: {$params['photoId']}");
+			$this->getLogger()->success("解析成功~ 用户ID: {$params['userId']} | 作品ID: {$params['photoId']}");
 			$this->getLogger()->debug("解析地址: {$url}");
-			if(ask('是否继续执行下载操作?', 'Y', 'warning') !== 'Y') {
+			if(strtolower((string) ask('是否继续执行下载操作?', 'Y', 'warning')) !== 'y') {
 				$this->getLogger()->info('已终止.');
 				return true;
 			}
 			$this->getLogger()->notice("解析成功, 正在尝试获取目标图床, 此操作过程预计在10分钟以内完成, 请耐心等待...");
 			// $page = file_get_contents($url);
-			$page = $newCurl($mode)->setUrl($url)->exec()->getContent();
+			$page = $newCurl()->setUrl($url)->setCookie($curl->getCookie())->exec()->getContent();
 			if(!$page) {
 				$this->getLogger()->error("解析失败, 可能请求超时, 请稍后重试.");
 				return true;
@@ -177,9 +176,9 @@ class KuaiCommand extends \owoframe\console\CommandBase
 					system('start ' . $outputPath);
 				}
 			} else {
-				$this->getLogger()->warning('文件保存失败, 尝试使用移动UA [mode=0] 有几率能够成功解析资源地址.');
+				$this->getLogger()->warning('文件保存失败, 尝试切换UA有几率能够成功解析资源地址.');
 			}
-		}
+		} */
 		return true;
 	}
 
