@@ -1,7 +1,8 @@
 # KuaishouParser
 快手短视频批量下载脚本
 
-此项目采用 `OwOFrame` 进行的后端构建, 需要配套使用. 项目地址: [点我](https://github.com/Tommy131/OwOFrame)
+此项目采用 `OwOFrame` 进行的后端构建, 需要配套使用. 项目地址: [点我](https://github.com/Tommy131/OwOFrame)<br/>
+前端的Log输出采用 `OwOTools`, 已集成在JavaScript脚本中. 项目地址: [点我](https://github.com/Tommy131/OwOTools)
 
 ## 实现目标
 
@@ -13,7 +14,6 @@
 - [ ] 敬请期待......给个Star鼓励我开发吧！！！拜托了！！！
 
 ## 怎么使用?
-此项目分为 `分享解析`.
 1. 先克隆项目[OwOFrame](https://github.com/Tommy131/OwOFrame)到一个文件目录下.
 2. 安装好后端框架 `OwOFrame` 之后, 将此项目克隆到 `application` 项目内.
 3. 重命名 `KuaishouParser` 为 `kuai`.
