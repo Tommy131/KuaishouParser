@@ -1,0 +1,11 @@
+query visionProfile($userId: String) {
+  visionProfile(userId: $userId) {
+    userProfile {
+      profile {
+        gender
+        user_name
+        user_text
+      }
+    }
+  }
+}

@@ -1,0 +1,20 @@
+query privateFeedsQuery($userId: String, $count: Int) {
+  privateFeeds(principalId: $userId, count: $count) {
+    list {
+      id
+      poster
+      workType
+      imgUrls
+      musicName
+      caption
+      location
+      onlyFollowerCanComment
+      timestamp
+      counts {
+        displayView
+        displayLike
+        displayComment
+      }
+    }
+  }
+}

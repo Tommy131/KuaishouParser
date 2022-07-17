@@ -1,0 +1,14 @@
+query sensitiveUserInfoQuery($userId: String) {
+  sensitiveUserInfo(principalId: $userId) {
+    kwaiId
+    originUserId
+    constellation
+    cityName
+    counts {
+      fan
+      photo
+      open
+      private
+    }
+  }
+}

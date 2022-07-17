@@ -72,16 +72,6 @@ class KuaiCommand extends \owoframe\console\CommandBase
 					'live' => 'privateFeedsQuery'
 				]
 			];
-			private $query = [
-				'authorData' => [
-					'www'  => "query visionProfile(\$userId: String) { visionProfile(userId: \$userId) { userProfile { profile { gender user_name user_text }}}}",
-					'live' => "query sensitiveUserInfoQuery(\$userId: String) {  sensitiveUserInfo(principalId: \$userId) { kwaiId originUserId constellation cityName counts { fan photo open private }}}"
-				],
-				'articleData' => [
-					'www'  => "query visionVideoDetail(\$photoId: String) { visionVideoDetail(photoId: \$photoId) { photo { likeCount realLikeCount coverUrl photoUrl viewCount } tags { type name }}}",
-					'live' => "query privateFeedsQuery(\$userId: String, \$count: Int) { privateFeeds(principalId: \$userId, count: \$count) { list { id poster workType imgUrls musicName caption location onlyFollowerCanComment timestamp counts { displayView displayLike displayComment }}}}"
-				]
-			];
 
 			public function getName(string $type) : ?string
 			{
@@ -90,7 +80,18 @@ class KuaiCommand extends \owoframe\console\CommandBase
 
 			public function getQuery(string $type) : ?string
 			{
-				return $this->query[$type][$this->platform] ?? null;
+				$appPath = KuaiApp::getAppPath() . 'graphql' . DIRECTORY_SEPARATOR;
+				$query = [
+					'authorData' => [
+						'www'  => file_get_contents($appPath . 'visionProfile.graphql'),
+						'live' => file_get_contents($appPath . 'sensitiveUserInfoQuery.graphql')
+					],
+					'articleData' => [
+						'www'  => file_get_contents($appPath . 'visionVideoDetail.graphql'),
+						'live' => file_get_contents($appPath . 'privateFeedsQuery.graphql')
+					]
+				];
+				return $query[$type][$this->platform] ?? null;
 			}
 
 			public function setPlatform(string $platform = 'www') : void
@@ -110,13 +111,13 @@ class KuaiCommand extends \owoframe\console\CommandBase
 
 		$object = $this->Graphql($this)->setOperationName($operation->getName('authorData'))->setVariables(['userId' => $userId])->setQuery($operation->getQuery('authorData'));
 		$result = $object->sendQuery($graphql_www, $cookie_www)->getResult();
-		$result = $result->visionProfile->userProfile;
 
 		if(is_null($result)) {
 			$this->getLogger()->error('[0x001] 请求失败, 请稍后重试.');
 			return true;
 		}
 
+		$result      = $result->visionProfile->userProfile;
 		$gender      = $result->profile->gender;
 		$displayName = $result->profile->user_name;
 		$description = $result->profile->user_text;
