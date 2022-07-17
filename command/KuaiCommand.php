@@ -20,7 +20,6 @@ namespace application\kuai\command;
 use application\kuai\KuaiApp;
 use owoframe\helper\Helper;
 use owoframe\exception\OwOFrameException;
-use owoframe\object\JSON;
 use owoframe\utils\Curl;
 use owoframe\utils\TextFormat;
 
@@ -33,242 +32,361 @@ class KuaiCommand extends \owoframe\console\CommandBase
 		}
 		$savePath = SAVE_PATH;
 
-		if(isset($params[0]) && is_string($params[0]) && (strtolower($params[0]) === 'file')) {
-			$authorId = array_shift($params);
-			$authorId = array_shift($params);
-			if(!is_string($authorId)) {
-				$this->getLogger()->info('请输入一个有效的AuthorID. 用法: ' . self::getUsage() . ' file [string:AuthorId]');
-				return false;
-			}
-			$outputPath = $savePath . $authorId . DIRECTORY_SEPARATOR;
-			if(is_dir($outputPath)) {
-				$list = file_get_contents($outputPath . 'serialized.txt');
-				if(!is_serialized($list)) {
-					$this->getLogger()->error('文件格式错误, 请确认文件数据是否已经标准序列化.');
-					return true;
-				}
-				$list  = (array) unserialize($list);
-				$total = count($list);
+		#--------------------------------------------------------------------------#
 
-				$this->getLogger()->info('文件加载成功! 总共获取到 ' . $total . ' 个作品, 即将进行下载请求...');
+		// ~需要查询的用户ID;
+		$userId = array_shift($params);
+		if(!preg_match('/[0-9a-z_]+/i', $userId)) {
+			$this->getLogger()->error('无效的用户ID! 请检查是否正确输入.');
+			return false;
+		}
 
-				$current = 0;
-				TextFormat::sendClear();
-				foreach($list as $id => $item) {
-					++$current;
-					TextFormat::sendProgressBar($current, $total, "[{$current}/{$total}] 正在请求下载作品 '{$id}'...", function() use ($item, $outputPath, $id) {
-						usleep(1500);
-						$result = ['status' => null, 'message' => ''];
-						if(is_array($item)) {
-							foreach($item as $url) {
-								$result['status'] = $this->saveFile($url, $outputPath . $id . DIRECTORY_SEPARATOR);
-								$result['message'] = "作品ID '{$id}' 保存成功!";
-							}
-						} else {
-							$result['status'] = $this->saveFile($item, $outputPath);
-							$result['message'] = "作品ID '{$id}' 保存失败!";
-						}
-						return $result;
-					});
-				}
-
-				if(Helper::getOS() === Helper::OS_WINDOWS) {
-					system('start ' . $outputPath);
-				}
-				$this->getLogger()->success("操作成功完成, 已将 '{$total}' 个作品保存在目录 '{$outputPath}' 下.");
-			} else {
-				$this->getLogger()->error('不存在该文件夹, 无法执行操作.');
-			}
+		// ~自动下载作品选项;
+		$autoDownload = (count($params) > 0) ? array_shift($params) : false;
+		if(preg_match('/true|\-t/i', $autoDownload)) {
+			$autoDownload = true;
+			$this->getLogger()->notice('已开启自动下载作品!');
 		} else {
-			$database = new JSON(SAVE_PATH . 'database.json', [], true);
-			$newCurl  = function(bool $returnHeader = false) {
-				$pc   = 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/98.0.4758.102 Safari/537.36 Edg/98.0.1108.62';
-				$_    = (new Curl())->setUA($pc)->returnBody(true)->returnHeader($returnHeader);
-				$ip   = Curl::getRadomIp();
-				$_->setHeader([
-					'CLIENT-IP: ' . $ip,
-					'X-FORWARDED-FOR: ' . $ip,
-					'User-Agent: ' . $pc
-				]);
-				ini_set('user_agent', $pc);
-				return $_;
-			};
+			$autoDownload = false;
+		}
 
-			$authorId    = array_shift($params);
-			if(!preg_match('/[0-9a-z_]+/i', $authorId)) {
-				$this->getLogger()->error('无效的用户ID! 请检查是否正确输入.');
-				return false;
+		// ~读取Cookies;
+		$cookie_live = KuaiApp::getCookie('live');
+		$cookie_www  = KuaiApp::getCookie('www');
+
+		// ~不同的请求接口;
+		$graphql_live = 'https://live.kuaishou.com/live_graphql';
+		$graphql_www  = 'https://www.kuaishou.com/graphql';
+
+		#-------------------------------------------------------------------------#
+
+		$operation = new class($this) {
+			private $platform = 'www';
+			private $names = [
+				'authorData' => [
+					'www'  => 'visionProfile',
+					'live' => 'sensitiveUserInfoQuery'
+				],
+				'articleData' => [
+					'www'  => 'visionVideoDetail',
+					'live' => 'privateFeedsQuery'
+				]
+			];
+			private $query = [
+				'authorData' => [
+					'www'  => "query visionProfile(\$userId: String) { visionProfile(userId: \$userId) { userProfile { profile { gender user_name user_text }}}}",
+					'live' => "query sensitiveUserInfoQuery(\$userId: String) {  sensitiveUserInfo(principalId: \$userId) { kwaiId originUserId constellation cityName counts { fan photo open private }}}"
+				],
+				'articleData' => [
+					'www'  => "query visionVideoDetail(\$photoId: String) { visionVideoDetail(photoId: \$photoId) { photo { likeCount realLikeCount coverUrl photoUrl viewCount } tags { type name }}}",
+					'live' => "query privateFeedsQuery(\$userId: String, \$count: Int) { privateFeeds(principalId: \$userId, count: \$count) { list { id poster workType imgUrls musicName caption location onlyFollowerCanComment timestamp counts { displayView displayLike displayComment }}}}"
+				]
+			];
+
+			public function getName(string $type) : ?string
+			{
+				return $this->names[$type][$this->platform] ?? null;
 			}
-			$forceUpdate = (count($params) > 0) ? array_shift($params) : false;
-			if(preg_match('/true|\-t/i', $forceUpdate)) {
-				$forceUpdate = true;
-				$this->getLogger()->notice('已开启强制更新数据!');
-			}
-			$autoDownload = (count($params) > 0) ? array_shift($params) : false;
-			if(preg_match('/true|\-t/i', $autoDownload)) {
-				$autoDownload = true;
-				$this->getLogger()->notice('已开启自动下载作品!');
+
+			public function getQuery(string $type) : ?string
+			{
+				return $this->query[$type][$this->platform] ?? null;
 			}
 
-			$this->getLogger()->notice("正在读取用户ID [{$authorId}] 的数据...");
-
-
-			// 选择平台;
-			$baseUrl     = 'https://%s.kuaishou.com/%sgraphql?operationName=';
-			$selectedUrl = '';
-			$kuaiPlatformSelected = array_shift($params) ?? 'www';
-			if($kuaiPlatformSelected === 'kuai') {
-				$selectedUrl = sprintf($baseUrl, 'live', 'live_');
-			} else {
-				$selectedUrl = sprintf($baseUrl, 'www', '');
+			public function setPlatform(string $platform = 'www') : void
+			{
+				$this->platform = $platform;
 			}
-			// 注意两个平台的Cookie并不相通;
-			$cookie = KuaiApp::getCookie();
+		};
+
+		$getGender = function(string $gender, int $mode = 0) {
+			return ($mode === 0) ? (($gender === 'M') ? '他' : '她') : (($gender === 'M') ? '男' : '女');
+		};
+
+		// 获取作者信息;
+		$this->getLogger()->notice("若多次尝试仍然请求失败, 极大几率是Cookie失效, 无法请求API, 请打开网站 '§3https://live.kuaishou.com§6' 和 '§3https://www.kuaishou.com§6' 登录并且复制Cookie到 `KuaiApp` 的方法内.");
+		$this->getLogger()->notice("登录后在浏览器控制台 (§wF12§6) 中输入 `§3document.cookie§6` 即可获取Cookie.");
+		$this->getLogger()->info("正在查询......");
+
+		$object = $this->Graphql($this)->setOperationName($operation->getName('authorData'))->setVariables(['userId' => $userId])->setQuery($operation->getQuery('authorData'));
+		$result = $object->sendQuery($graphql_www, $cookie_www)->getResult();
+		$result = $result->visionProfile->userProfile;
+
+		if(is_null($result)) {
+			$this->getLogger()->error('[0x001] 请求失败, 请稍后重试.');
+			return true;
+		}
+
+		$gender      = $result->profile->gender;
+		$displayName = $result->profile->user_name;
+		$description = $result->profile->user_text;
+
+		$operation->setPlatform('live');
+		$object = $this->Graphql($this)->setOperationName($operation->getName('authorData'))->setVariables(['userId' => $userId])->setQuery($operation->getQuery('authorData'));
+		$result = $object->sendQuery($graphql_live, $cookie_live)->getResult();
+
+		if(is_null($result)) {
+			$this->getLogger()->error('[0x002] 请求失败, 请稍后重试.');
+			return true;
+		}
+
+		$result        = $result->sensitiveUserInfo;
+		$kwaiId        = $result->kwaiId;
+		$originUserId  = $result->originUserId;
+		$constellation = $result->constellation;
+		$cityName      = $result->cityName;
+
+		$fansCount     = $result->counts->fan;
+		$articleCount  = $result->counts->photo;
+		$privateCount  = $result->counts->private ?? 0;
+
+		$this->getLogger()->info("--------------------[UserId:§3{$userId}§w]--------------------");
+		$this->getLogger()->info($getGender($gender) . "所在的城市: §b§l{$cityName}§r§w | 性别: §1{$getGender($gender, 1)}§r§w | 星座: §7{$constellation}");
+		$this->getLogger()->info("快手号: §3{$kwaiId}§r§w | 原始ID: §3{$originUserId}§r§w | 显示名称: §b§3{$displayName}§r§w | 粉丝数: §7{$fansCount}§r§w | 作品数量: §7{$articleCount}§r§w | 私有作品: §7{$privateCount}");
+		$this->getLogger()->info($getGender($gender) . '的个人简介: §r§i' . str_replace("\n", '  ', $description));
+		$this->getLogger()->info('----------------------------------------------------------------');
 
 
-			// 获取作者信息;
-			$operationName = 'visionProfile';
-			$query    = "query visionProfile(\$userId: String) {\n  visionProfile(userId: \$userId) {\n    result\n    hostName\n    userProfile {\n      ownerCount {\n        fan\n        photo\n        follow\n        photo_public\n        __typename\n      }\n      profile {\n        gender\n        user_name\n        user_id\n        headurl\n        user_text\n        user_profile_bg_url\n        __typename\n      }\n      isFollowing\n      __typename\n    }\n    __typename\n  }\n}\n";
-			$variables = json_encode([
-				'userId'  => $authorId
-			]);
 
-			$authorData = $newCurl()->setTimeout(120)->setUrl($selectedUrl . $operationName)->setcookieRaw($cookie)->setPostData([
-				'variables' => $variables,
-				'query'     => $query
-			])->exec()->getContent();
+		$operation->setPlatform('live');
+		$object = $this->Graphql($this)->setOperationName($operation->getName('articleData'))->setVariables(['userId' => $userId, 'count' => $articleCount])->setQuery($operation->getQuery('articleData'));
+		$result = $object->sendQuery($graphql_live, $cookie_live)->getResult();
 
-			if(!is_bool($authorData)) {
-				$authorData = json_decode($authorData);
-				$authorData = $authorData->data->{$operationName};
-			} else {
-				$this->getLogger()->error('[0x00] 数据抓取失败! 请稍后重试 (此用户ID可能无效).');
+		if(is_null($result)) {
+			$this->getLogger()->error('[0x003] 请求失败, 请稍后重试.');
+			return true;
+		}
+
+		$result = $result->privateFeeds->list;
+		$this->getLogger()->sendEmpty();
+		$this->getLogger()->info($getGender($gender) . '在快手一共发布了 §b§1' . count($result) . '§r§w 个作品!');
+		$this->getLogger()->sendEmpty();
+
+		$authorPath = $savePath . $userId . DIRECTORY_SEPARATOR;
+		foreach($result as $article) {
+			$location      = $article->location ?? 'N/A';
+			$coordinate    = ($location !== 'N/A') ? "{$location->longitude}° {$location->latitude}°" : '';
+			$location      = ($location !== 'N/A') ? "§2{$article->location->address} §w(在 §2{$article->location->city}§w 标注了 §4{$article->location->title}" : '无';
+			$uploadTime    = date('Y-m-d H:i:s', $article->timestamp / 1000);
+			$allowComments = $article->onlyFollowerCanComment ? '§1仅允许关注者评论' : '§5允许';
+
+			// ~单个作品的详细数据查询;
+			$operation->setPlatform('www');
+			$object = $this->Graphql($this)->setOperationName($operation->getName('articleData'))->setVariables(['photoId' => $article->id])->setQuery($operation->getQuery('articleData'));
+			$result = $object->sendQuery($graphql_www, $cookie_www)->getResult();
+
+			if(is_null($result)) {
+				$this->getLogger()->error('[0x004] 请求失败, 请稍后重试.');
 				return true;
 			}
 
-			if($authorData->result === 1) {
-				$authorData = $authorData->userProfile;
-				if(is_null($authorData->ownerCount) || is_null($authorData->profile)) {
-					$this->getLogger()->error("[1x00] Cookie已失效, 无法获取完整数据, 请打开访问 '§3https://{$kuaiPlatformSelected}.kuaishou.com§1' 登录并且重新获取Cookie!");
-					$this->getLogger()->error("登录后在浏览器控制台 (§wF12§1) 中输入 `§3document.cookie§1` 即可重新获取Cookie.");
-				return true;
-				}
-				$this->getLogger()->success('读取成功! 以下是获取到的数据:');
-				// 作者粉丝;
-				$fansCount    = $authorData->ownerCount->fan;
-				// 作者作品数;
-				$articleCount = $authorData->ownerCount->photo_public;
-				$displayName  = $authorData->profile->user_name;
-				$gender       = strtoupper($authorData->profile->gender);
-				$getGender    = function(int $mode = 0) use($gender) {
-					return ($mode === 0) ? (($gender === 'M') ? '他' : '她') : (($gender === 'M') ? '男' : '女');
-				};
+			$result        = $result->visionVideoDetail;
+			$realLikeCount = $result->photo->realLikeCount ?? 'N/A';
+			$videoUrl      = $result->photo->photoUrl ?? 'N/A'; // 不要修改, 快手的命名问题;
+			// $tags          = $result->tags;
 
-				// 转存本地数据;
-				/* if(!$database->exists($authorId) || $forceUpdate) {
-					$database->set('fansCount',    $fansCount);
-					$database->set('articleCount', $articleCount);
-					$database->set('displayName',  $displayName);
-					$database->set('getGender',    $getGender);
-					$database->set('updateTime',   microtime(true));
-				} */
+			$this->getLogger()->info('----------------------------------------------------------------');
+			$this->getLogger()->info("上传时间: §2{$uploadTime}§r§w | 定位: {$location}§r§w | 经纬度: §g{$coordinate}");
+			$this->getLogger()->info("作品ID: §3{$article->id}§r§w | 类型: §3{$article->workType}§r§w | 公开评论: {$allowComments}§r§w | 评论数: §7{$article->counts->displayComment}");
+			$this->getLogger()->info("获赞数: §7{$article->counts->displayLike}§r§w (§1{$realLikeCount}§r§w) | 共计观看次数: §7{$article->counts->displayView}");
+			$this->getLogger()->info('文章标题及标签: §g' . str_replace("\n", '  ', $article->caption));
 
-				$this->getLogger()->info('§8-------------------------------------');
-				$this->getLogger()->info("显示名称: §b§3{$displayName}§r§w | 性别: §1{$getGender(1)}§r§w | 粉丝数: §7{$fansCount}§r§w | 作品数量: §7{$articleCount}");
-				$this->getLogger()->info($getGender() . "的个人简介: §r§i" . str_replace("\n", "  ", $authorData->profile->user_text));
-				$this->getLogger()->info('§8-------------------------------------');
-			} else {
-				$this->getLogger()->error('[0x01] 数据抓取失败! 请稍后重试 (无效的Cookie).');
-				return true;
-			}
+			if($article->workType === 'vertical') {
+				$imgUrls = $article->imgUrls;
+				$this->getLogger()->info('共计 §1' . count($imgUrls). '§w 张图片!');
 
-
-			$this->getLogger()->notice("尝试获取用户 [{$displayName}|{$authorId}] 的作品集...");
-			// 获取当前作者的作品;
-			$operationName = 'visionProfilePhotoList';
-			$query    = "fragment photoContent on PhotoEntity {\n  id\n  duration\n  caption\n  likeCount\n  viewCount\n  realLikeCount\n  coverUrl\n  photoUrl\n  photoH265Url\n  manifest\n  manifestH265\n  videoResource\n  coverUrls {\n    url\n    __typename\n  }\n  timestamp\n  expTag\n  animatedCoverUrl\n  distance\n  videoRatio\n  liked\n  stereoType\n  profileUserTopPhoto\n  __typename\n}\n\nfragment feedContent on Feed {\n  type\n  author {\n    id\n    name\n    headerUrl\n    following\n    headerUrls {\n      url\n      __typename\n    }\n    __typename\n  }\n  photo {\n    ...photoContent\n    __typename\n  }\n  canAddComment\n  llsid\n  status\n  currentPcursor\n  __typename\n}\n\nquery visionProfilePhotoList(\$pcursor: String, \$userId: String, \$page: String, \$webPageArea: String) {\n  visionProfilePhotoList(pcursor: \$pcursor, userId: \$userId, page: \$page, webPageArea: \$webPageArea) {\n    result\n    llsid\n    webPageArea\n    feeds {\n      ...feedContent\n      __typename\n    }\n    hostName\n    pcursor\n    __typename\n  }\n}\n";
-
-			$variables = json_encode([
-				'userId'  => $authorId,
-				'pcursor' => '',
-				'page'    => 'profile',
-				'count'   => $articleCount
-			]);
-
-			$articleData = $newCurl()->setUrl($selectedUrl . $operationName)->setcookieRaw($cookie)->setPostData([
-				'variables' => $variables,
-				'query'     => $query
-			])->exec()->getContent();
-
-			if(!is_bool($articleData)) {
-				$articleData = json_decode($articleData);
-				$articleData = $articleData->data->{$operationName};
-			} else {
-				$this->getLogger()->error('[0x02] 数据抓取失败! 请稍后重试.');
-				return true;
-			}
-
-			if($articleData->result === 1) {
-				$articleData = $articleData->feeds;
-				$this->getLogger()->success("读取成功! 以下是获取到的数据 (共 " . count($articleData) . " 条):");
-
-				foreach($articleData as $k => $v) {
-					$article = $v->photo;
-					$this->getLogger()->info('§8>>>>>>>>>>>>>>><<<<<<<<<<<<<<<');
-					$this->getLogger()->info("作品ID: §3{$article->id}§r§w | 获赞数: §b§6{$article->likeCount}§r§w (§b§1{$article->realLikeCount}§r§w) | 浏览量: §l{$article->viewCount}");
-					$this->getLogger()->info("标题: §r{$article->caption}");
-					$this->getLogger()->info("视频下载地址: §r{$article->photoUrl}");
-					$this->getLogger()->info('§8>>>>>>>>>>>>>>><<<<<<<<<<<<<<<');
-
-					if($autoDownload) {
-						$this->getLogger()->info("§8准备下载视频 [§3{$article->id}]...");
-						$savePath = SAVE_PATH . $authorId;
-						if(!is_dir($savePath)) {
-							mkdir($savePath, 755, true);
-						}
-						$fileName = $savePath . DIRECTORY_SEPARATOR . $article->id . '.mp4';
-
-						// 先检查一次是否存在, 防止重复下载;
-						if(!file_exists($fileName)) {
-							file_put_contents($fileName, file_get_contents($article->photoUrl));
-						}
-						// 第二次检测是否下载成功;
-						if(!file_exists($fileName)) {
-							$this->getLogger()->error('视频下载失败!');
+				if($autoDownload) {
+					foreach($imgUrls as $url) {
+						$path = explode('.', $url);
+						$path[count($path) - 1] = 'jpg';
+						$url  = implode('.', $path);
+						$this->getLogger()->debug('正在下载: ' . $url);
+						if(!$this->saveFile($url, $authorPath . $article->id . DIRECTORY_SEPARATOR, $article->id, $status)) {
+							$this->getLogger()->error(rtrim('保存失败! ' . ($status ?? '')));
 						} else {
-							$this->getLogger()->success('视频保存成功!');
+							if(!is_null($status)) {
+								$this->getLogger()->info($status);
+								continue;
+							}
+							$this->getLogger()->success('保存成功!');
 						}
 					}
 				}
+			} else {
 				if($autoDownload) {
-					system('start ' . $savePath);
-					$this->getLogger()->success('已打开视频保存地址.');
+					$this->getLogger()->debug('正在下载: ' . $videoUrl);
+					if(!$this->saveFile($videoUrl, $authorPath, $article->id, $status)) {
+						$this->getLogger()->error(rtrim('保存失败! ' . ($status ?? '')));
+					} else {
+						if(!is_null($status)) {
+							$this->getLogger()->info($status);
+							continue;
+						}
+						$this->getLogger()->success('保存成功!');
+					}
 				}
 			}
 		}
+		if($autoDownload) {
+			if(Helper::getOS() === 'windows') {
+				system('start ' . $authorPath);
+				$this->getLogger()->success('已打开保存文件夹.');
+			}
+		}
+		$this->getLogger()->info('----------------------------------------------------------------');
+
 		return true;
 	}
 
-	private function saveFile(string $url, string $outputPath) : bool
+
+	/**
+	 * 一个简单的Graphql请求处理方法
+	 *
+	 * @author HanskiJay
+	 * @since  2022-07-17
+	 * @return object
+	 */
+	private function Graphql() : object
+	{
+		return new class($this)
+		{
+			private $command;
+
+			/* 原始数据 */
+			public $encoded = '';
+			public $operationName, $query = '';
+			public $variables = [];
+
+			/* 处理结果 */
+			public $result = null;
+
+			public function __construct(KuaiCommand $command)
+			{
+				$this->command = $command;
+			}
+
+			public function setOperationName(string $name)
+			{
+				$this->operationName = $name;
+				return $this;
+			}
+
+			public function setVariables(array $variables)
+			{
+				$this->variables = array_merge($variables, $this->variables);
+				return $this;
+			}
+
+			public function setQuery(string $query)
+			{
+				$this->query = $query;
+				return $this;
+			}
+
+			public function encode() : string
+			{
+				return $this->encoded = json_encode([
+					'operationName' => $this->operationName,
+					'variables'     => $this->variables,
+					'query'         => $this->query
+				]);
+			}
+
+			public function sendQuery(string $url, string $cookie = '', int $timeout = 60)
+			{
+				$curl    = $this->command->initCurl()->setUrl($url)->setTimeOut($timeout)->setCookieRaw($cookie);
+				$content = $curl->setPostDataRaw($this->encode())->exec()->getContent();
+
+				if(!is_bool($content)) {
+					$content = json_decode($content);
+					if(is_object($content)) {
+						$this->result = $content;
+					}
+				}
+				return $this;
+			}
+
+			public function getResult() : ?object
+			{
+				if(isset($this->result->data)) {
+					$this->result = $this->result->data;
+				}
+				return $this->result ?? null;
+			}
+		};
+	}
+
+	/**
+	 * 初始化Curl请求
+	 *
+	 * @param  string|null $userAgent
+	 * @param  boolean     $returnBody
+	 * @param  boolean     $useRadomIp
+	 * @param  boolean     $returnHeader
+	 * @author HanskiJay
+	 * @since  2022-07-17
+	 * @return Curl
+	 */
+	public function initCurl(?string $userAgent = null, bool $returnBody = true, bool $useRadomIp = true, bool $returnHeader = false) : Curl
+	{
+		$userAgent = 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/103.0.5060.114 Safari/537.36 Edg/103.0.1264.62';
+		$curl      = (new Curl())->setUA($userAgent)->returnBody($returnBody)->returnHeader($returnHeader);
+
+		if($useRadomIp) {
+			$radomIp   = Curl::getRadomIp();
+			$curl->setHeader([
+				'CLIENT-IP: ' . $radomIp,
+				'X-FORWARDED-FOR: ' . $radomIp
+			]);
+		}
+
+		$curl->setHeader([
+			'User-Agent: ' . $userAgent,
+			'Content-Type: application/json; charset=UTF-8'
+		]);
+
+		ini_set('user_agent', $userAgent);
+		return $curl;
+	}
+
+	/**
+	 * 保存文件到本地
+	 *
+	 * !Attention: 文件保存名称的优先级为 parse_url($url)['path] > $saveName
+	 *
+	 * @param  string  $url
+	 * @param  string  $outputPath
+	 * @param  string  $saveName
+	 * @param  string  &$status
+	 * @author HanskiJay
+	 * @since  2022-07-17
+	 * @return boolean
+	 */
+	private function saveFile(string $url, string $outputPath, string $saveName = '', ?string &$status = null) : bool
 	{
 		if(!is_dir($outputPath)) {
 			mkdir($outputPath, 777, true);
 		}
-		$saveName = explode('/', parse_url($url)['path']);
-		$saveName = end($saveName);
-		// $this->getLogger()->info('正在保存文件: ' . $outputPath . $saveName);
-		// $this->getLogger()->info('来自远程URL: ' . $url);
+
+		$pu = parse_url($url);
+		if(!empty($pu['path'])) {
+			$saveName = explode('/', $pu['path']);
+			$saveName = end($saveName);
+		} else {
+			$status = '无法通过URL设置文件名!';
+		}
+
+		if(!Helper::isDomain($pu['host'])) {
+			$status = '无效的网址!';
+			return false;
+		}
+
 		if(is_file($outputPath . $saveName)) {
-			// $this->getLogger()->notice('文件已存在, 跳过下载.');
+			$status = '文件已存在, 跳过下载.';
 			return true;
 		}
 		@file_put_contents($outputPath . $saveName, file_get_contents($url));
-		if(!is_file($outputPath . $saveName)) {
-			// $this->getLogger()->error('文件下载失败!');
-			return false;
-		} else {
-			return true;
-		}
+		return is_file($outputPath . $saveName);
 	}
 
 	public static function getAliases() : array
