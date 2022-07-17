@@ -251,7 +251,7 @@ const kuai = {
         initData.isInitialized = true;
       }
     }
-    else if (/^kuaishou.com$/.test(location.hostname)) {
+    else if (/^www.kuaishou.com$/.test(location.hostname)) {
       this.platform = 1;
       this.selector = document.querySelectorAll('img.poster-img');
       if (this.selector !== null) {
@@ -418,7 +418,6 @@ const kuai = {
           behavior: 'smooth'
         });
       }
-
     }
   },
   removeCurrentExecute(selector, number) {

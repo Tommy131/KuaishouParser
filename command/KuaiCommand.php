@@ -17,8 +17,10 @@
 **********************************************************************/
 namespace application\kuai\command;
 
+use application\kuai\KuaiApp;
 use owoframe\helper\Helper;
 use owoframe\exception\OwOFrameException;
+use owoframe\object\JSON;
 use owoframe\utils\Curl;
 use owoframe\utils\TextFormat;
 
@@ -77,108 +79,173 @@ class KuaiCommand extends \owoframe\console\CommandBase
 			} else {
 				$this->getLogger()->error('不存在该文件夹, 无法执行操作.');
 			}
-			return true;
-		}
+		} else {
+			$database = new JSON(SAVE_PATH . 'database.json', [], true);
+			$newCurl  = function(bool $returnHeader = false) {
+				$pc   = 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/98.0.4758.102 Safari/537.36 Edg/98.0.1108.62';
+				$_    = (new Curl())->setUA($pc)->returnBody(true)->returnHeader($returnHeader);
+				$ip   = Curl::getRadomIp();
+				$_->setHeader([
+					'CLIENT-IP: ' . $ip,
+					'X-FORWARDED-FOR: ' . $ip,
+					'User-Agent: ' . $pc
+				]);
+				ini_set('user_agent', $pc);
+				return $_;
+			};
 
-		// 下列方法已失效! 2022-06-11
-		/* $shareId = array_shift($params);
-		if(empty($shareId)) {
-			$this->getLogger()->info('请输入一个有效的分享ID. 用法: ' . self::getUsage() . ' [string:shareId]');
-			return false;
-		}
+			$authorId    = array_shift($params);
+			if(!preg_match('/[0-9a-z_]+/i', $authorId)) {
+				$this->getLogger()->error('无效的用户ID! 请检查是否正确输入.');
+				return false;
+			}
+			$forceUpdate = (count($params) > 0) ? array_shift($params) : false;
+			if(preg_match('/true|\-t/i', $forceUpdate)) {
+				$forceUpdate = true;
+				$this->getLogger()->notice('已开启强制更新数据!');
+			}
+			$autoDownload = (count($params) > 0) ? array_shift($params) : false;
+			if(preg_match('/true|\-t/i', $autoDownload)) {
+				$autoDownload = true;
+				$this->getLogger()->notice('已开启自动下载作品!');
+			}
 
-		$baseUrl  = 'https://live.kuaishou.com/u/';
-		$shareUrl = 'https://v.kuaishou.com/s/';
-		// $shareUrl = 'https://v.kuaishouapp.com/s/';
+			$this->getLogger()->notice("正在读取用户ID [{$authorId}] 的数据...");
 
 
-		$ip = Curl::getRadomIp();
-		$newCurl = function() use ($ip) {
-			$pc     = 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/98.0.4758.102 Safari/537.36 Edg/98.0.1108.62';
-			$_      = (new Curl())->setUA( $pc)->returnBody(true)->returnHeader(true);
-			$_->setHeader([
-				'CLIENT-IP: ' . $ip,
-				'X-FORWARDED-FOR: ' . $ip,
-				'User-Agent: ' . $pc
+			// 选择平台;
+			$baseUrl     = 'https://%s.kuaishou.com/%sgraphql?operationName=';
+			$selectedUrl = '';
+			$kuaiPlatformSelected = array_shift($params) ?? 'www';
+			if($kuaiPlatformSelected === 'kuai') {
+				$selectedUrl = sprintf($baseUrl, 'live', 'live_');
+			} else {
+				$selectedUrl = sprintf($baseUrl, 'www', '');
+			}
+			// 注意两个平台的Cookie并不相通;
+			$cookie = KuaiApp::getCookie();
+
+
+			// 获取作者信息;
+			$operationName = 'visionProfile';
+			$query    = "query visionProfile(\$userId: String) {\n  visionProfile(userId: \$userId) {\n    result\n    hostName\n    userProfile {\n      ownerCount {\n        fan\n        photo\n        follow\n        photo_public\n        __typename\n      }\n      profile {\n        gender\n        user_name\n        user_id\n        headurl\n        user_text\n        user_profile_bg_url\n        __typename\n      }\n      isFollowing\n      __typename\n    }\n    __typename\n  }\n}\n";
+			$variables = json_encode([
+				'userId'  => $authorId
 			]);
-			ini_set('user_agent', $pc);
-			return $_;
-		};
 
-		$this->getLogger()->info("正在解析分享ID: [shareId={$shareId}]");
-		$curl    = $newCurl()->setUrl($shareUrl . $shareId)->exec();
-		$result  = curl_getinfo($curl->getResource());
-		// var_dump($curl->getContent());exit;
+			$authorData = $newCurl()->setTimeout(120)->setUrl($selectedUrl . $operationName)->setcookieRaw($cookie)->setPostData([
+				'variables' => $variables,
+				'query'     => $query
+			])->exec()->getContent();
 
-		if(isset($result['redirect_url'])) {
-			$data = parse_url($result['redirect_url']);
-			$data = $data['query'] ?? null;
-			if(is_null($data)) {
-				$this->getLogger()->error("分享ID [shareId={$shareId}] 无效!");
-				return true;
-			}
-			// $this->getLogger()->debug('Raw Url: ' . $result['redirect_url']);
-			parse_str($data, $params);
-			$url  = $baseUrl . $params['userId'] . '/' . $params['photoId'] . '?' . $data;
-			$this->getLogger()->success("解析成功~ 用户ID: {$params['userId']} | 作品ID: {$params['photoId']}");
-			$this->getLogger()->debug("解析地址: {$url}");
-			if(strtolower((string) ask('是否继续执行下载操作?', 'Y', 'warning')) !== 'y') {
-				$this->getLogger()->info('已终止.');
-				return true;
-			}
-			$this->getLogger()->notice("解析成功, 正在尝试获取目标图床, 此操作过程预计在10分钟以内完成, 请耐心等待...");
-			// $page = file_get_contents($url);
-			$page = $newCurl()->setUrl($url)->setCookie($curl->getCookie())->exec()->getContent();
-			if(!$page) {
-				$this->getLogger()->error("解析失败, 可能请求超时, 请稍后重试.");
-				return true;
-			}
-			// var_dump($page);exit;
-			$outputPath = $savePath . $params['userId'] . DIRECTORY_SEPARATOR . $params['photoId'] . DIRECTORY_SEPARATOR;
-			$count = 0;
-
-			if(preg_match_all('/type="video\/mp4" src="(.*)"/imU', $page, $matches)) {
-				foreach($matches[1] as $image) {
-					if((stripos($image, 'upic/') !== false) || (stripos($image, 'upic') !== false)) {
-						if($this->saveFile($image, $outputPath)) {
-							$count++;
-							usleep(1500);
-						}
-					}
-				}
-			}
-			elseif(preg_match_all('/img src="(.*)"/imU', $page, $matches)) {
-				foreach($matches[1] as $image) {
-					// var_dump($matches);
-					if((stripos($image, 'ufile/atlas') !== false) || (stripos($image, 'upic') !== false)) {
-						if($this->saveFile($image, $outputPath)) {
-							$count++;
-							usleep(1500);
-						}
-					}
-				}
-			}
-			elseif(preg_match_all('/img class="play-image" src="(.*)"/imU', $page, $matches)) {
-				foreach($matches[2] as $image) {
-					if((stripos($image, 'ufile/atlas') !== false) || (stripos($image, 'upic') !== false)) {
-						if($this->saveFile($image, $outputPath)) {
-							$count++;
-							usleep(1500);
-						}
-					}
-				}
+			if(!is_bool($authorData)) {
+				$authorData = json_decode($authorData);
+				$authorData = $authorData->data->{$operationName};
 			} else {
-				$this->getLogger()->error('无法匹配到任何资源.');
+				$this->getLogger()->error('[0x00] 数据抓取失败! 请稍后重试 (此用户ID可能无效).');
+				return true;
 			}
-			if($count > 0) {
-				$this->getLogger()->success("操作成功完成, 已将 '{$count}' 个文件保存在目录 '{$outputPath}' 下.");
-				if(Helper::getOS() === Helper::OS_WINDOWS) {
-					system('start ' . $outputPath);
+
+			if($authorData->result === 1) {
+				$authorData = $authorData->userProfile;
+				if(is_null($authorData->ownerCount) || is_null($authorData->profile)) {
+					$this->getLogger()->error("[1x00] Cookie已失效, 无法获取完整数据, 请打开访问 '§3https://{$kuaiPlatformSelected}.kuaishou.com§1' 登录并且重新获取Cookie!");
+					$this->getLogger()->error("登录后在浏览器控制台 (§wF12§1) 中输入 `§3document.cookie§1` 即可重新获取Cookie.");
+				return true;
 				}
+				$this->getLogger()->success('读取成功! 以下是获取到的数据:');
+				// 作者粉丝;
+				$fansCount    = $authorData->ownerCount->fan;
+				// 作者作品数;
+				$articleCount = $authorData->ownerCount->photo_public;
+				$displayName  = $authorData->profile->user_name;
+				$gender       = strtoupper($authorData->profile->gender);
+				$getGender    = function(int $mode = 0) use($gender) {
+					return ($mode === 0) ? (($gender === 'M') ? '他' : '她') : (($gender === 'M') ? '男' : '女');
+				};
+
+				// 转存本地数据;
+				/* if(!$database->exists($authorId) || $forceUpdate) {
+					$database->set('fansCount',    $fansCount);
+					$database->set('articleCount', $articleCount);
+					$database->set('displayName',  $displayName);
+					$database->set('getGender',    $getGender);
+					$database->set('updateTime',   microtime(true));
+				} */
+
+				$this->getLogger()->info('§8-------------------------------------');
+				$this->getLogger()->info("显示名称: §b§3{$displayName}§r§w | 性别: §1{$getGender(1)}§r§w | 粉丝数: §7{$fansCount}§r§w | 作品数量: §7{$articleCount}");
+				$this->getLogger()->info($getGender() . "的个人简介: §r§i" . str_replace("\n", "  ", $authorData->profile->user_text));
+				$this->getLogger()->info('§8-------------------------------------');
 			} else {
-				$this->getLogger()->warning('文件保存失败, 尝试切换UA有几率能够成功解析资源地址.');
+				$this->getLogger()->error('[0x01] 数据抓取失败! 请稍后重试 (无效的Cookie).');
+				return true;
 			}
-		} */
+
+
+			$this->getLogger()->notice("尝试获取用户 [{$displayName}|{$authorId}] 的作品集...");
+			// 获取当前作者的作品;
+			$operationName = 'visionProfilePhotoList';
+			$query    = "fragment photoContent on PhotoEntity {\n  id\n  duration\n  caption\n  likeCount\n  viewCount\n  realLikeCount\n  coverUrl\n  photoUrl\n  photoH265Url\n  manifest\n  manifestH265\n  videoResource\n  coverUrls {\n    url\n    __typename\n  }\n  timestamp\n  expTag\n  animatedCoverUrl\n  distance\n  videoRatio\n  liked\n  stereoType\n  profileUserTopPhoto\n  __typename\n}\n\nfragment feedContent on Feed {\n  type\n  author {\n    id\n    name\n    headerUrl\n    following\n    headerUrls {\n      url\n      __typename\n    }\n    __typename\n  }\n  photo {\n    ...photoContent\n    __typename\n  }\n  canAddComment\n  llsid\n  status\n  currentPcursor\n  __typename\n}\n\nquery visionProfilePhotoList(\$pcursor: String, \$userId: String, \$page: String, \$webPageArea: String) {\n  visionProfilePhotoList(pcursor: \$pcursor, userId: \$userId, page: \$page, webPageArea: \$webPageArea) {\n    result\n    llsid\n    webPageArea\n    feeds {\n      ...feedContent\n      __typename\n    }\n    hostName\n    pcursor\n    __typename\n  }\n}\n";
+
+			$variables = json_encode([
+				'userId'  => $authorId,
+				'pcursor' => '',
+				'page'    => 'profile',
+				'count'   => $articleCount
+			]);
+
+			$articleData = $newCurl()->setUrl($selectedUrl . $operationName)->setcookieRaw($cookie)->setPostData([
+				'variables' => $variables,
+				'query'     => $query
+			])->exec()->getContent();
+
+			if(!is_bool($articleData)) {
+				$articleData = json_decode($articleData);
+				$articleData = $articleData->data->{$operationName};
+			} else {
+				$this->getLogger()->error('[0x02] 数据抓取失败! 请稍后重试.');
+				return true;
+			}
+
+			if($articleData->result === 1) {
+				$articleData = $articleData->feeds;
+				$this->getLogger()->success("读取成功! 以下是获取到的数据 (共 " . count($articleData) . " 条):");
+
+				foreach($articleData as $k => $v) {
+					$article = $v->photo;
+					$this->getLogger()->info('§8>>>>>>>>>>>>>>><<<<<<<<<<<<<<<');
+					$this->getLogger()->info("作品ID: §3{$article->id}§r§w | 获赞数: §b§6{$article->likeCount}§r§w (§b§1{$article->realLikeCount}§r§w) | 浏览量: §l{$article->viewCount}");
+					$this->getLogger()->info("标题: §r{$article->caption}");
+					$this->getLogger()->info("视频下载地址: §r{$article->photoUrl}");
+					$this->getLogger()->info('§8>>>>>>>>>>>>>>><<<<<<<<<<<<<<<');
+
+					if($autoDownload) {
+						$this->getLogger()->info("§8准备下载视频 [§3{$article->id}]...");
+						$savePath = SAVE_PATH . $authorId;
+						if(!is_dir($savePath)) {
+							mkdir($savePath, 755, true);
+						}
+						$fileName = $savePath . DIRECTORY_SEPARATOR . $article->id . '.mp4';
+
+						// 先检查一次是否存在, 防止重复下载;
+						if(!file_exists($fileName)) {
+							file_put_contents($fileName, file_get_contents($article->photoUrl));
+						}
+						// 第二次检测是否下载成功;
+						if(!file_exists($fileName)) {
+							$this->getLogger()->error('视频下载失败!');
+						} else {
+							$this->getLogger()->success('视频保存成功!');
+						}
+					}
+				}
+				if($autoDownload) {
+					system('start ' . $savePath);
+					$this->getLogger()->success('已打开视频保存地址.');
+				}
+			}
+		}
 		return true;
 	}
 

@@ -57,5 +57,15 @@ class KuaiApp extends \owoframe\application\AppBase
 	{
 		return '快手作品解析后端';
 	}
+
+	public static function getCookie() : string
+	{
+		return '(cookie: string)';
+	}
+
+	public static function getVersion(): string
+	{
+		return '1.0.1';
+	}
 }
 ?>
