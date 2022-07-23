@@ -21,7 +21,6 @@ use application\kuai\KuaiApp;
 use owoframe\helper\Helper;
 use owoframe\exception\OwOFrameException;
 use owoframe\utils\Curl;
-use owoframe\utils\TextFormat;
 
 class KuaiCommand extends \owoframe\console\CommandBase
 {
@@ -70,6 +69,10 @@ class KuaiCommand extends \owoframe\console\CommandBase
 				'articleData' => [
 					'www'  => 'visionVideoDetail',
 					'live' => 'privateFeedsQuery'
+				],
+				'searchEID' => [
+					'www' => 'graphqlSearchUser',
+					'live' => ''
 				]
 			];
 
@@ -89,6 +92,10 @@ class KuaiCommand extends \owoframe\console\CommandBase
 					'articleData' => [
 						'www'  => file_get_contents($appPath . 'visionVideoDetail.graphql'),
 						'live' => file_get_contents($appPath . 'privateFeedsQuery.graphql')
+					],
+					'searchEID' => [
+						'www' => file_get_contents($appPath . 'graphqlSearchUser.graphql'),
+						'live' => ''
 					]
 				];
 				return $query[$type][$this->platform] ?? null;
@@ -105,19 +112,31 @@ class KuaiCommand extends \owoframe\console\CommandBase
 		};
 
 		// 获取作者信息;
-		$this->getLogger()->notice("若多次尝试仍然请求失败, 极大几率是Cookie失效, 无法请求API, 请打开网站 '§3https://live.kuaishou.com§6' 和 '§3https://www.kuaishou.com§6' 登录并且复制Cookie到 `KuaiApp` 的方法内.");
+		$this->getLogger()->notice("若多次尝试仍然请求失败, 极大几率是Cookie失效, 无法请求API, 请打开网站 '§3https://live.kuaishou.com§6' 和 '§3https://www.kuaishou.com§6' 登录并且复制Cookie到配置文件.");
 		$this->getLogger()->notice("登录后在浏览器控制台 (§wF12§6) 中输入 `§3document.cookie§6` 即可获取Cookie.");
 		$this->getLogger()->info("正在查询......");
 
+		$object = $this->Graphql($this)->setOperationName($operation->getName('searchEID'))->setVariables(['keyword' => $userId])->setQuery($operation->getQuery('searchEID'));
+		$result = $object->sendQuery($graphql_www, $cookie_www)->getResult();
+		$result = $result->visionSearchUser ?? null;
+
+		if(!is_null($result)) {
+			$result = is_array($result->users) ? array_shift($result->users) : [];
+			$result = !empty($result) ? $result->user_id : null;
+			if(is_string($result)) {
+				$userId = $result;
+			}
+		}
+
 		$object = $this->Graphql($this)->setOperationName($operation->getName('authorData'))->setVariables(['userId' => $userId])->setQuery($operation->getQuery('authorData'));
 		$result = $object->sendQuery($graphql_www, $cookie_www)->getResult();
+		$result = $result->visionProfile->userProfile ?? null;
 
 		if(is_null($result)) {
 			$this->getLogger()->error('[0x001] 请求失败, 请稍后重试.');
 			return true;
 		}
 
-		$result      = $result->visionProfile->userProfile;
 		$gender      = $result->profile->gender;
 		$displayName = $result->profile->user_name;
 		$description = $result->profile->user_text;
@@ -125,13 +144,13 @@ class KuaiCommand extends \owoframe\console\CommandBase
 		$operation->setPlatform('live');
 		$object = $this->Graphql($this)->setOperationName($operation->getName('authorData'))->setVariables(['userId' => $userId])->setQuery($operation->getQuery('authorData'));
 		$result = $object->sendQuery($graphql_live, $cookie_live)->getResult();
+		$result = $result->sensitiveUserInfo ?? null;
 
 		if(is_null($result)) {
 			$this->getLogger()->error('[0x002] 请求失败, 请稍后重试.');
 			return true;
 		}
 
-		$result        = $result->sensitiveUserInfo;
 		$kwaiId        = $result->kwaiId;
 		$originUserId  = $result->originUserId;
 		$constellation = $result->constellation;
@@ -152,19 +171,19 @@ class KuaiCommand extends \owoframe\console\CommandBase
 		$operation->setPlatform('live');
 		$object = $this->Graphql($this)->setOperationName($operation->getName('articleData'))->setVariables(['userId' => $userId, 'count' => $articleCount])->setQuery($operation->getQuery('articleData'));
 		$result = $object->sendQuery($graphql_live, $cookie_live)->getResult();
+		$result = $result->privateFeeds->list ?? null;
 
 		if(is_null($result)) {
 			$this->getLogger()->error('[0x003] 请求失败, 请稍后重试.');
 			return true;
 		}
 
-		$result = $result->privateFeeds->list;
 		$this->getLogger()->sendEmpty();
 		$this->getLogger()->info($getGender($gender) . '在快手一共发布了 §b§1' . count($result) . '§r§w 个作品!');
 		$this->getLogger()->sendEmpty();
 
 		$authorPath = $savePath . $userId . DIRECTORY_SEPARATOR;
-		foreach($result as $article) {
+		foreach($result as $k => $article) {
 			$location      = $article->location ?? 'N/A';
 			$coordinate    = ($location !== 'N/A') ? "{$location->longitude}° {$location->latitude}°" : '';
 			$location      = ($location !== 'N/A') ? "§2{$article->location->address} §w(在 §2{$article->location->city}§w 标注了 §4{$article->location->title}" : '无';
@@ -175,19 +194,19 @@ class KuaiCommand extends \owoframe\console\CommandBase
 			$operation->setPlatform('www');
 			$object = $this->Graphql($this)->setOperationName($operation->getName('articleData'))->setVariables(['photoId' => $article->id])->setQuery($operation->getQuery('articleData'));
 			$result = $object->sendQuery($graphql_www, $cookie_www)->getResult();
+			$result = $result->visionVideoDetail ?? null;
 
 			if(is_null($result)) {
 				$this->getLogger()->error('[0x004] 请求失败, 请稍后重试.');
 				return true;
 			}
 
-			$result        = $result->visionVideoDetail;
 			$realLikeCount = $result->photo->realLikeCount ?? 'N/A';
 			$videoUrl      = $result->photo->photoUrl ?? 'N/A'; // 不要修改, 快手的命名问题;
 			// $tags          = $result->tags;
 
 			$this->getLogger()->info('----------------------------------------------------------------');
-			$this->getLogger()->info("上传时间: §2{$uploadTime}§r§w | 定位: {$location}§r§w | 经纬度: §g{$coordinate}");
+			$this->getLogger()->info("[No.{$k}] 上传时间: §2{$uploadTime}§r§w | 定位: {$location}§r§w | 经纬度: §g{$coordinate}");
 			$this->getLogger()->info("作品ID: §3{$article->id}§r§w | 类型: §3{$article->workType}§r§w | 公开评论: {$allowComments}§r§w | 评论数: §7{$article->counts->displayComment}");
 			$this->getLogger()->info("获赞数: §7{$article->counts->displayLike}§r§w (§1{$realLikeCount}§r§w) | 共计观看次数: §7{$article->counts->displayView}");
 			$this->getLogger()->info('文章标题及标签: §g' . str_replace("\n", '  ', $article->caption));
@@ -296,6 +315,10 @@ class KuaiCommand extends \owoframe\console\CommandBase
 			public function sendQuery(string $url, string $cookie = '', int $timeout = 60)
 			{
 				$curl    = $this->command->initCurl()->setUrl($url)->setTimeOut($timeout)->setCookieRaw($cookie);
+				if(KuaiApp::useProxyServer('status')) {
+					$array = KuaiApp::useProxyServer('data');
+					$curl->useProxy($array[0], $array[1]);
+				}
 				$content = $curl->setPostDataRaw($this->encode())->exec()->getContent();
 
 				if(!is_bool($content)) {

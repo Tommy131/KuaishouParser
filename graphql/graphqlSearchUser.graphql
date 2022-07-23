@@ -1,0 +1,7 @@
+query graphqlSearchUser($keyword: String) {
+  visionSearchUser(keyword: $keyword) {
+    users {
+      user_id
+    }
+  }
+}
