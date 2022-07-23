@@ -42,7 +42,7 @@ class KuaiCommand extends \owoframe\console\CommandBase
 
 		// ~自动下载作品选项;
 		$autoDownload = (count($params) > 0) ? array_shift($params) : false;
-		if(preg_match('/true|\-t/i', $autoDownload)) {
+		if(preg_match('/--autoDownload/i', $autoDownload)) {
 			$autoDownload = true;
 			$this->getLogger()->notice('已开启自动下载作品!');
 		} else {
@@ -315,10 +315,6 @@ class KuaiCommand extends \owoframe\console\CommandBase
 			public function sendQuery(string $url, string $cookie = '', int $timeout = 60)
 			{
 				$curl    = $this->command->initCurl()->setUrl($url)->setTimeOut($timeout)->setCookieRaw($cookie);
-				if(KuaiApp::useProxyServer('status')) {
-					$array = KuaiApp::useProxyServer('data');
-					$curl->useProxy($array[0], $array[1]);
-				}
 				$content = $curl->setPostDataRaw($this->encode())->exec()->getContent();
 
 				if(!is_bool($content)) {
@@ -353,7 +349,7 @@ class KuaiCommand extends \owoframe\console\CommandBase
 	 */
 	public function initCurl(?string $userAgent = null, bool $returnBody = true, bool $useRadomIp = true, bool $returnHeader = false) : Curl
 	{
-		$userAgent = 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/103.0.5060.114 Safari/537.36 Edg/103.0.1264.62';
+		$userAgent = $userAgent ?? 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/103.0.5060.114 Safari/537.36 Edg/103.0.1264.62';
 		$curl      = (new Curl())->setUA($userAgent)->returnBody($returnBody)->returnHeader($returnHeader);
 
 		if($useRadomIp) {
@@ -368,6 +364,12 @@ class KuaiCommand extends \owoframe\console\CommandBase
 			'User-Agent: ' . $userAgent,
 			'Content-Type: application/json; charset=UTF-8'
 		]);
+
+		// 检测是否开启了代理;
+		if(KuaiApp::useProxyServer('status')) {
+			$array = KuaiApp::useProxyServer('data');
+			$curl->useProxy($array[0], $array[1]);
+		}
 
 		ini_set('user_agent', $userAgent);
 		return $curl;

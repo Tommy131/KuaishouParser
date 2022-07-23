@@ -7,7 +7,7 @@
 ## 实现目标
 
 - [x] 支持解析单个作者的全部作品
-- [x] ~~支持解析分享的视频链接(尽管作品被作者设为不允许下载)~~ (正在尝试修复)
+- [x] 支持解析分享的视频链接(尽管作品被作者设为不允许下载)
 - [x] 后台日志显示最近的解析记录
 - [ ] 定时解析指定作者的作品
 - [x] 记录解析作品的详情（标题，发布时间，赞数等）
@@ -25,11 +25,13 @@
 - 在 `CMD` 或 `任意终端` 中输入指令 `php owo kuai [作者ID]` 进行资源地址批量下载.
 - 下载的视频目前皆为无水印视频.
 
-可携带的参数: php owo kuai [authorId: string] (forceUpdate: true|false|-t|-f) (autoDownload: true|false|-t|-f) (platform: string)<br/>
-- authorId:     作者ID (不同平台的ID不同, 域名开通为 `www` 为数字英文字母混合; `live` 开头为用户自定义或默认的ID)
-- forceUpdate:  强制更新本地数据的选项 (`true/-t` 为确认更新, `false/-f` 为关闭状态)
+可携带的参数: php owo kuai [authorId: string] (--autoDownload)<br/>
+- authorId:     作者ID (不同平台的ID不同, 域名开头为 `www` 的ID为数字英文字母混合; 开头为`live` 的ID为用户自定义或默认的ID)
 - autoDownload: 自动下载获取到的作品 (参数同上)
-- platform:     选择平台 (默认为 `www`, 也可以选择 `live`)
+
+<br/>解析分享ID使用的命令: `php owo kuai shareId [id:string]`<br/>
+此处的 `id` 为 `https://v.kuaishou.com/sharId` 中的 `shareId`.
+
 
 ## 特性
 - [x] 支持保存客户端中无法下载的视频/照片
