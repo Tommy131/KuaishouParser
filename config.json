@@ -1,0 +1,11 @@
+{
+    "cookie": {
+        "live": "(cookie: string)",
+        "www" : "(cookie: string)"
+    },
+    "proxy": {
+        "status": false,
+        "address": "127.0.0.1",
+        "port": 10809
+    }
+}

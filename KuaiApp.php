@@ -21,6 +21,7 @@ namespace application\kuai;
 
 use application\kuai\command\KuaiCommand;
 use owoframe\MasterManager;
+use owoframe\object\JSON;
 
 class KuaiApp extends \owoframe\application\AppBase
 {
@@ -60,15 +61,31 @@ class KuaiApp extends \owoframe\application\AppBase
 
 	public static function getCookie(string $platform = 'www') : string
 	{
+		$config = new JSON(self::getAppPath() . 'config.json');
 		$cookies = [
-			'live' => '(cookie: string)',
-			'www'  => '(cookie: string)'
+			'live' => $config->get('cookie.live') ?? '',
+			'www'  => $config->get('cookie.www') ?? ''
 		];
 
 		if(!isset($cookies[$platform])) {
 			$platform = 'www';
 		}
 		return $cookies[$platform];
+	}
+
+	public static function useProxyServer(string $type)
+	{
+		$config = new JSON(self::getAppPath() . 'config.json');
+		switch(strtolower($type)) {
+			case 'status':
+				return $config->get('proxy.status') ?? false;
+
+			case 'data':
+				return [
+					$config->get('proxy.address') ?? '127.0.0.1',
+					$config->get('proxy.port') ?? 10809
+				];
+		}
 	}
 
 	public static function getVersion(): string
