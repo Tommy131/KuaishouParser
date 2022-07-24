@@ -30,13 +30,12 @@ class KuaiApp extends \owoframe\application\AppBase
 		if(!defined('SAVE_PATH')) {
 			define('SAVE_PATH', STORAGE_A_PATH . 'kuaiApp' . DIRECTORY_SEPARATOR); // 默认将解析到的作品资源保存在框架的资源存储文件目录下;
 		}
-		$this->setDefaultController('Kuai');
 		MasterManager::getInstance()->getUnit('console')->registerCommand(KuaiCommand::getName(), KuaiCommand::class);
 	}
 
 	public static function isCLIOnly() : bool
 	{
-		return false;
+		return true;
 	}
 
 	public static function autoTo404Page() : bool
