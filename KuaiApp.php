@@ -59,7 +59,7 @@ class KuaiApp extends \owoframe\application\AppBase
 		return '快手作品解析后端';
 	}
 
-	public static function getCookie(string $platform = 'www') : string
+	public static function getCookies(string $platform = 'www') : string
 	{
 		$config = new JSON(self::getAppPath() . 'config.json');
 		$cookies = [

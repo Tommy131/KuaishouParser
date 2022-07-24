@@ -24,6 +24,10 @@ use owoframe\utils\Curl;
 
 class KuaiCommand extends \owoframe\console\CommandBase
 {
+	public const GRAPHQL_LIVE = 'https://live.kuaishou.com/live_graphql';
+	public const GRAPHQL_WWW = 'https://www.kuaishou.com/graphql';
+
+
 	public function execute(array $params) : bool
 	{
 		if(!defined('SAVE_PATH')) {
@@ -33,6 +37,19 @@ class KuaiCommand extends \owoframe\console\CommandBase
 
 		#--------------------------------------------------------------------------#
 
+		// ~自动下载作品选项;
+		$autoDownload = array_search('--autoDownload', $params);
+		if(!is_bool($autoDownload)) {
+			unset($params[$autoDownload]);
+			$params = array_values($params);
+			$autoDownload = true;
+			$this->getLogger()->notice('已开启自动下载作品!');
+		} else {
+			$autoDownload = false;
+		}
+
+		if($this->interceptParameters($params, $autoDownload)) return true;
+
 		// ~需要查询的用户ID;
 		$userId = array_shift($params);
 		if(!preg_match('/[0-9a-z_]+/i', $userId)) {
@@ -40,72 +57,13 @@ class KuaiCommand extends \owoframe\console\CommandBase
 			return false;
 		}
 
-		// ~自动下载作品选项;
-		$autoDownload = (count($params) > 0) ? array_shift($params) : false;
-		if(preg_match('/--autoDownload/i', $autoDownload)) {
-			$autoDownload = true;
-			$this->getLogger()->notice('已开启自动下载作品!');
-		} else {
-			$autoDownload = false;
-		}
-
 		// ~读取Cookies;
-		$cookie_live = KuaiApp::getCookie('live');
-		$cookie_www  = KuaiApp::getCookie('www');
-
-		// ~不同的请求接口;
-		$graphql_live = 'https://live.kuaishou.com/live_graphql';
-		$graphql_www  = 'https://www.kuaishou.com/graphql';
+		$cookie_live = KuaiApp::getCookies('live');
+		$cookie_www  = KuaiApp::getCookies('www');
 
 		#-------------------------------------------------------------------------#
 
-		$operation = new class($this) {
-			private $platform = 'www';
-			private $names = [
-				'authorData' => [
-					'www'  => 'visionProfile',
-					'live' => 'sensitiveUserInfoQuery'
-				],
-				'articleData' => [
-					'www'  => 'visionVideoDetail',
-					'live' => 'privateFeedsQuery'
-				],
-				'searchEID' => [
-					'www' => 'graphqlSearchUser',
-					'live' => ''
-				]
-			];
-
-			public function getName(string $type) : ?string
-			{
-				return $this->names[$type][$this->platform] ?? null;
-			}
-
-			public function getQuery(string $type) : ?string
-			{
-				$appPath = KuaiApp::getAppPath() . 'graphql' . DIRECTORY_SEPARATOR;
-				$query = [
-					'authorData' => [
-						'www'  => file_get_contents($appPath . 'visionProfile.graphql'),
-						'live' => file_get_contents($appPath . 'sensitiveUserInfoQuery.graphql')
-					],
-					'articleData' => [
-						'www'  => file_get_contents($appPath . 'visionVideoDetail.graphql'),
-						'live' => file_get_contents($appPath . 'privateFeedsQuery.graphql')
-					],
-					'searchEID' => [
-						'www' => file_get_contents($appPath . 'graphqlSearchUser.graphql'),
-						'live' => ''
-					]
-				];
-				return $query[$type][$this->platform] ?? null;
-			}
-
-			public function setPlatform(string $platform = 'www') : void
-			{
-				$this->platform = $platform;
-			}
-		};
+		$operation = self::getOperation();
 
 		$getGender = function(string $gender, int $mode = 0) {
 			return ($mode === 0) ? (($gender === 'M') ? '他' : '她') : (($gender === 'M') ? '男' : '女');
@@ -117,7 +75,7 @@ class KuaiCommand extends \owoframe\console\CommandBase
 		$this->getLogger()->info("正在查询......");
 
 		$object = $this->Graphql($this)->setOperationName($operation->getName('searchEID'))->setVariables(['keyword' => $userId])->setQuery($operation->getQuery('searchEID'));
-		$result = $object->sendQuery($graphql_www, $cookie_www)->getResult();
+		$result = $object->sendQuery(self::GRAPHQL_WWW, $cookie_www)->getResult();
 		$result = $result->visionSearchUser ?? null;
 
 		if(!is_null($result)) {
@@ -129,7 +87,7 @@ class KuaiCommand extends \owoframe\console\CommandBase
 		}
 
 		$object = $this->Graphql($this)->setOperationName($operation->getName('authorData'))->setVariables(['userId' => $userId])->setQuery($operation->getQuery('authorData'));
-		$result = $object->sendQuery($graphql_www, $cookie_www)->getResult();
+		$result = $object->sendQuery(self::GRAPHQL_WWW, $cookie_www)->getResult();
 		$result = $result->visionProfile->userProfile ?? null;
 
 		if(is_null($result)) {
@@ -143,7 +101,7 @@ class KuaiCommand extends \owoframe\console\CommandBase
 
 		$operation->setPlatform('live');
 		$object = $this->Graphql($this)->setOperationName($operation->getName('authorData'))->setVariables(['userId' => $userId])->setQuery($operation->getQuery('authorData'));
-		$result = $object->sendQuery($graphql_live, $cookie_live)->getResult();
+		$result = $object->sendQuery(self::GRAPHQL_LIVE, $cookie_live)->getResult();
 		$result = $result->sensitiveUserInfo ?? null;
 
 		if(is_null($result)) {
@@ -151,7 +109,7 @@ class KuaiCommand extends \owoframe\console\CommandBase
 			return true;
 		}
 
-		$kwaiId        = $result->kwaiId;
+		$kwaiId        = $result->kwaiId ?? '未定义';
 		$originUserId  = $result->originUserId;
 		$constellation = $result->constellation;
 		$cityName      = $result->cityName;
@@ -170,7 +128,7 @@ class KuaiCommand extends \owoframe\console\CommandBase
 
 		$operation->setPlatform('live');
 		$object = $this->Graphql($this)->setOperationName($operation->getName('articleData'))->setVariables(['userId' => $userId, 'count' => $articleCount])->setQuery($operation->getQuery('articleData'));
-		$result = $object->sendQuery($graphql_live, $cookie_live)->getResult();
+		$result = $object->sendQuery(self::GRAPHQL_LIVE, $cookie_live)->getResult();
 		$result = $result->privateFeeds->list ?? null;
 
 		if(is_null($result)) {
@@ -193,7 +151,7 @@ class KuaiCommand extends \owoframe\console\CommandBase
 			// ~单个作品的详细数据查询;
 			$operation->setPlatform('www');
 			$object = $this->Graphql($this)->setOperationName($operation->getName('articleData'))->setVariables(['photoId' => $article->id])->setQuery($operation->getQuery('articleData'));
-			$result = $object->sendQuery($graphql_www, $cookie_www)->getResult();
+			$result = $object->sendQuery(self::GRAPHQL_WWW, $cookie_www)->getResult();
 			$result = $result->visionVideoDetail ?? null;
 
 			if(is_null($result)) {
@@ -220,30 +178,12 @@ class KuaiCommand extends \owoframe\console\CommandBase
 						$path = explode('.', $url);
 						$path[count($path) - 1] = 'jpg';
 						$url  = implode('.', $path);
-						$this->getLogger()->debug('正在下载: ' . $url);
-						if(!$this->saveFile($url, $authorPath . $article->id . DIRECTORY_SEPARATOR, $article->id, $status)) {
-							$this->getLogger()->error(rtrim('保存失败! ' . ($status ?? '')));
-						} else {
-							if(!is_null($status)) {
-								$this->getLogger()->info($status);
-								continue;
-							}
-							$this->getLogger()->success('保存成功!');
-						}
+						$this->download($url, $authorPath . $article->id . DIRECTORY_SEPARATOR, $article->id);
 					}
 				}
 			} else {
 				if($autoDownload) {
-					$this->getLogger()->debug('正在下载: ' . $videoUrl);
-					if(!$this->saveFile($videoUrl, $authorPath, $article->id, $status)) {
-						$this->getLogger()->error(rtrim('保存失败! ' . ($status ?? '')));
-					} else {
-						if(!is_null($status)) {
-							$this->getLogger()->info($status);
-							continue;
-						}
-						$this->getLogger()->success('保存成功!');
-					}
+					$this->download($videoUrl, $authorPath, $article->id);
 				}
 			}
 		}
@@ -258,6 +198,121 @@ class KuaiCommand extends \owoframe\console\CommandBase
 		return true;
 	}
 
+	/**
+	 * 拦截参数方法
+	 *
+	 * @author HanskiJay
+	 * @since  2022-07-24
+	 * @param  array   $params
+	 * @param  array   $autoDownload
+	 * @return boolean
+	 */
+	private function interceptParameters(array $params, bool $autoDownload = false) : bool
+	{
+		switch(array_shift($params)) {
+			case 'shareId':
+				$shareId = array_shift($params) ?? null;
+				if(is_null($shareId)) {
+					$this->getLogger()->error('无效的分享ID! 请检查是否正确输入.');
+				} else {
+					$this->getLogger()->info("正在解析单个分享作品 [§2shareId§w=§3{$shareId}§w] ......");
+					$result = $this->initCurl()->returnHeader(true)->setUrl('https://v.kuaishou.com/' . $shareId)->exec()->getContent();
+					if(!is_bool($result) && preg_match('/^Location: (.*)$/imU', $result, $match)) {
+						$result  = parse_url($match[1]);
+						$photoId = $result['path'] ?? null;
+
+						if(!is_null($photoId)) {
+							$photoId = @end(explode('/', $result['path']));
+							$operation = $this->getOperation();
+							$operation->setPlatform('www2');
+							$object = $this->Graphql($this)->setOperationName($operation->getName('searchEID'))->setVariables(['photoId' => $photoId])->setQuery($operation->getQuery('searchEID'));
+							$result = $object->sendQuery(self::GRAPHQL_WWW, KuaiApp::getCookies('www'))->getResult();
+							$result = $result->visionVideoDetail ?? null;
+							$author = $result->author;
+							$photo  = $result->photo;
+
+							$realLikeCount = $photo->realLikeCount ?? 'N/A';
+
+							$this->getLogger()->info('已获取到简单的作品信息:');
+							$this->getLogger()->info('----------------------------------------------------------------');
+							$this->getLogger()->info("作品ID: §3{$photo->id}§r§w | 获赞数: §7{$photo->likeCount}§r§w (§1{$realLikeCount}§r§w) | 共计观看次数: §7{$photo->viewCount}");
+							$this->getLogger()->info("作者ID: §3{$author->id}§r§w | 显示名称: §3{$author->name}");
+							$this->getLogger()->info('文章标题及标签: §5' . str_replace("\n", '  ', $photo->caption));
+							$this->getLogger()->info('----------------------------------------------------------------');
+
+							if($autoDownload) {
+								$savePath = SAVE_PATH . $author->id . DIRECTORY_SEPARATOR;
+								$this->download($photo->photoUrl, $savePath);
+								system('start ' . $savePath);
+							}
+						}
+					} else {
+						$this->getLogger()->error('无法找到有效的数据.');
+					}
+				}
+				return true;
+			break;
+		}
+		return false;
+	}
+
+	/**
+	 * Graphql操作类
+	 *
+	 * @author HanskiJay
+	 * @since  2022-07-24
+	 * @return object
+	 */
+	private static function getOperation() : object
+	{
+		return new class {
+			private $platform = 'www';
+			private $names = [
+				'authorData' => [
+					'www'  => 'visionProfile',
+					'live' => 'sensitiveUserInfoQuery'
+				],
+				'articleData' => [
+					'www'  => 'visionVideoDetail',
+					'live' => 'privateFeedsQuery'
+				],
+				'searchEID' => [
+					'www' => 'graphqlSearchUser',
+					'www2' => 'visionVideoDetail'
+				]
+			];
+
+			public function getName(string $type) : ?string
+			{
+				return $this->names[$type][$this->platform] ?? null;
+			}
+
+			public function getQuery(string $type) : ?string
+			{
+				$appPath = KuaiApp::getAppPath() . 'graphql' . DIRECTORY_SEPARATOR;
+				$query = [
+					'authorData' => [
+						'www'  => file_get_contents($appPath . 'visionProfile.graphql'),
+						'live' => file_get_contents($appPath . 'sensitiveUserInfoQuery.graphql')
+					],
+					'articleData' => [
+						'www'  => file_get_contents($appPath . 'getRealVideoUrl.graphql'),
+						'live' => file_get_contents($appPath . 'privateFeedsQuery.graphql')
+					],
+					'searchEID' => [
+						'www' => file_get_contents($appPath . 'graphqlSearchUser.graphql'),
+						'www2' => file_get_contents($appPath . 'visionVideoDetail.graphql')
+					]
+				];
+				return $query[$type][$this->platform] ?? null;
+			}
+
+			public function setPlatform(string $platform = 'www') : void
+			{
+				$this->platform = $platform;
+			}
+		};
+	}
 
 	/**
 	 * 一个简单的Graphql请求处理方法
@@ -314,7 +369,7 @@ class KuaiCommand extends \owoframe\console\CommandBase
 
 			public function sendQuery(string $url, string $cookie = '', int $timeout = 60)
 			{
-				$curl    = $this->command->initCurl()->setUrl($url)->setTimeOut($timeout)->setCookieRaw($cookie);
+				$curl    = $this->command->initCurl()->setUrl($url)->setTimeOut($timeout)->setCookiesInRaw($cookie);
 				$content = $curl->setPostDataRaw($this->encode())->exec()->getContent();
 
 				if(!is_bool($content)) {
@@ -413,6 +468,30 @@ class KuaiCommand extends \owoframe\console\CommandBase
 		}
 		@file_put_contents($outputPath . $saveName, file_get_contents($url));
 		return is_file($outputPath . $saveName);
+	}
+
+	/**
+	 * 下载文件
+	 *
+	 * @author HanskiJay
+	 * @since  2022-07-24
+	 * @param  string $url
+	 * @param  string $savePath
+	 * @param  string $saveName
+	 * @return void
+	 */
+	private function download(string $url, string $savePath, string $saveName = '') : void
+	{
+		$this->getLogger()->debug('正在下载: ' . $url);
+		if(!$this->saveFile($url, $savePath, $saveName, $status)) {
+			$this->getLogger()->error(rtrim('保存失败! ' . ($status ?? '')));
+		} else {
+			if(!is_null($status)) {
+				$this->getLogger()->info($status);
+			} else {
+				$this->getLogger()->success('保存成功!');
+			}
+		}
 	}
 
 	public static function getAliases() : array
