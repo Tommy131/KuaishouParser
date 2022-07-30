@@ -62,8 +62,8 @@ class KuaiApp extends \owoframe\application\AppBase
 	{
 		$config = new JSON(self::getAppPath() . 'config.json');
 		$cookies = [
-			'live' => $config->get('cookie.live') ?? '',
-			'www'  => $config->get('cookie.www') ?? ''
+			'live' => $config->get('cookies.live') ?? '',
+			'www'  => $config->get('cookies.www') ?? ''
 		];
 
 		if(!isset($cookies[$platform])) {

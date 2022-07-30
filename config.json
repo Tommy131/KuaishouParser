@@ -1,5 +1,5 @@
 {
-    "cookie": {
+    "cookies": {
         "live": "(cookie: string)",
         "www" : "(cookie: string)"
     },
