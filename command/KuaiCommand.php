@@ -570,13 +570,11 @@ class KuaiCommand extends \owoframe\console\CommandBase
 	 */
 	private function Graphql() : object
 	{
-		return new class($this)
+		return new class($this->initCurl())
 		{
-			private $command;
 			private $curl;
 
 			/* 原始数据 */
-			public $encoded = '';
 			public $operationName, $query = '';
 			public $variables = [];
 
@@ -584,11 +582,12 @@ class KuaiCommand extends \owoframe\console\CommandBase
 
 			/* 处理结果 */
 			public $headers = '';
+			public $encoded = '';
 			public $result  = null;
 
-			public function __construct(KuaiCommand $command)
+			public function __construct(Curl $curl)
 			{
-				$this->command = $command;
+				$this->curl = $curl;
 			}
 
 			public function setOperationName(string $name) : object
@@ -620,7 +619,7 @@ class KuaiCommand extends \owoframe\console\CommandBase
 
 			public function sendQuery(string $url, string $cookie = '', int $timeout = 60) : object
 			{
-				$this->curl = $this->command->initCurl()->setUrl($url)->setTimeOut($timeout)->setCookiesInRaw($cookie);
+				$this->curl = $this->curl->setUrl($url)->setCookiesInRaw($cookie)->setTimeOut($timeout);
 
 				if(is_callable($this->beforeRequestCallback)) {
 					call_user_func_array($this->beforeRequestCallback, [$this->curl]);
@@ -628,7 +627,7 @@ class KuaiCommand extends \owoframe\console\CommandBase
 
 				$content = $this->curl->setPostDataRaw($this->encode())->exec()->getContent($this->headers);
 
-				if(!is_bool($content)) {
+				if(strlen($content) > 0) {
 					$content = json_decode($content);
 					if(is_object($content)) {
 						$this->result = $content;
@@ -642,7 +641,7 @@ class KuaiCommand extends \owoframe\console\CommandBase
 				if(isset($this->result->data)) {
 					$this->result = $this->result->data;
 				}
-				return $this->result ?? null;
+				return $this->result;
 			}
 
 			public function getCurl() : Curl
@@ -655,39 +654,30 @@ class KuaiCommand extends \owoframe\console\CommandBase
 	/**
 	 * 初始化Curl请求
 	 *
-	 * @param  string|null $userAgent
-	 * @param  boolean     $returnBody
 	 * @param  boolean     $useRadomIp
+	 * @param  boolean     $returnBody
 	 * @param  boolean     $returnHeader
 	 * @author HanskiJay
 	 * @since  2022-07-17
 	 * @return Curl
 	 */
-	public function initCurl(?string $userAgent = null, bool $returnBody = true, bool $useRadomIp = true, bool $returnHeader = false) : Curl
+	public function initCurl(bool $useRadomIp = true, bool $returnBody = true, bool $returnHeader = false) : Curl
 	{
-		$userAgent = $userAgent ?? 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/103.0.5060.114 Safari/537.36 Edg/103.0.1264.62';
-		$curl      = (new Curl())->setUA($userAgent)->returnBody($returnBody)->returnHeader($returnHeader);
+		$curl = (new Curl())->returnBody($returnBody)->returnHeader($returnHeader)->userAgentInPC();
 
 		if($useRadomIp) {
-			$radomIp   = Curl::getRadomIp();
+			$radomIp = Curl::getRadomIp();
 			$curl->setHeader([
 				'CLIENT-IP: ' . $radomIp,
 				'X-FORWARDED-FOR: ' . $radomIp
 			]);
 		}
 
-		$curl->setHeader([
-			'User-Agent: ' . $userAgent,
-			'Content-Type: application/json; charset=UTF-8'
-		]);
-
 		// 检测是否开启了代理;
 		if(KuaiApp::useProxyServer('status')) {
 			$array = KuaiApp::useProxyServer('data');
 			$curl->useProxy($array[0], $array[1]);
 		}
-
-		ini_set('user_agent', $userAgent);
 		return $curl;
 	}
 
