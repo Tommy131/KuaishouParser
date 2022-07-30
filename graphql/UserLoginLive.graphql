@@ -1,0 +1,5 @@
+mutation UserLogin($userLoginInfo: JSON) {
+  webLogin(userLoginInfo: $userLoginInfo) {
+    result
+  }
+}

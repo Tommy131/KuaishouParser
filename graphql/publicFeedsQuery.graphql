@@ -1,0 +1,64 @@
+query publicFeedsQuery($userId: String, $count: Int) {
+  publicFeeds(principalId: $userId, count: $count) {
+    live {
+      user {
+        id
+        avatar
+        name
+      }
+      watchingCount
+      poster
+      coverUrl
+      caption
+      id
+      playUrls {
+        quality
+        url
+      }
+      quality
+      gameInfo {
+        category
+        name
+        pubgSurvival
+        type
+        kingHero
+      }
+      hasRedPack
+      liveGuess
+      expTag
+    }
+    list {
+      id
+      thumbnailUrl
+      poster
+      workType
+      type
+      useVideoPlayer
+      imgUrls
+      imgSizes
+      magicFace
+      musicName
+      caption
+      location
+      liked
+      onlyFollowerCanComment
+      relativeHeight
+      timestamp
+      width
+      height
+      counts {
+        displayView
+        displayLike
+        displayComment
+      }
+      user {
+        id
+        eid
+        name
+        avatar
+      }
+      expTag
+      isSpherical
+    }
+  }
+}
