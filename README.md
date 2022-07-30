@@ -35,6 +35,10 @@
 - 此处的 `id` 为 `https://v.kuaishou.com/sharId` 中的 `shareId`
 - `--autoDownload`: 自动下载获取到的作品
 
+##### 指令3: 模拟登录 `php owo kuai --login (platform: string)`<br/>
+- 此处的 `platform` 为登录的站点/平台 (默认 `www.kuaishou.com` 及 `www`, `live.kuaishou.com` 为 `live`)
+- 根据提示进行操作! 如下图:
+![登录操作](static/img/tested_web_login.png)
 
 ## 特性
 - [x] 支持分享解析视频下载
