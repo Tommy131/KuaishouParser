@@ -230,38 +230,77 @@ class KuaiCommand extends \owoframe\console\CommandBase
 					$this->getLogger()->error('无效的分享ID! 请检查是否正确输入.');
 				} else {
 					$this->getLogger()->info("正在解析单个分享作品 [§2shareId§w=§3{$shareId}§w] ......");
-					$result = $this->initCurl()->returnHeader(true)->setUrl('https://v.kuaishou.com/' . $shareId)->exec()->getContent();
-					if(!is_bool($result) && preg_match('/^Location: (.*)$/imU', $result, $match)) {
+					$this->initCurl()->returnHeader(true)->setUrl('https://v.kuaishou.com/' . $shareId)->exec()->getContent($h);
+					if(($h !== '') && preg_match('/^Location: (.*)$/imU', $h, $match)) {
 						$result  = parse_url($match[1]);
 						$photoId = $result['path'] ?? null;
 
 						if(!is_null($photoId)) {
 							$photoId = @end(explode('/', $result['path']));
-							$operation = $this->getOperation();
-							$operation->setPlatform('www2');
-							$object = $this->Graphql($this)->setOperationName($operation->getName('searchEID'))->setVariables(['photoId' => $photoId])->setQuery($operation->getQuery('searchEID'));
-							$result = $object->sendQuery(self::GRAPHQL_WWW, KuaiApp::getCookies('www'))->getResult();
-							$result = $result->visionVideoDetail ?? null;
-							$author = $result->author;
-							$photo  = $result->photo;
 
-							$realLikeCount = $photo->realLikeCount ?? 'N/A';
+							$url  = 'https://v.m.chenzhongtech.com/rest/wd/photo/info';
+							$curl = $this->initCurl()->setUrl($url)->setPostData(['photoId' => $photoId], true)->setCookiesInRaw('did=web_')->setHeader([
+								'Content-Type: application/json; charset=UTF-8',
+								'Referer: ' . $match[1]
+							])->exec();
 
-							$this->getLogger()->info('已获取到简单的作品信息:');
+							$json = $curl->decodeWithJson(true);
+							if($json->result !== 1) {
+								$this->getLogger()->error('无法找到有效的数据, 请稍后重试.');
+								return true;
+							}
+
+							// 获取作者信息;
+							$userId       = $json->photo->userEid;
+							$originalId   = $json->photo->userId;
+							$kwaiId       = $json->photo->kwaiId ?? '未定义';
+							$userName     = $json->photo->userName;
+
+							$fansCount    = $json->counts->fanCount;
+							$followCount  = $json->counts->followCount;
+							$photoCount   = $json->counts->photoCount;
+
+							// 获取视频信息;
+							$likeCount    = $json->photo->likeCount;
+							$shareCount   = $json->photo->shareCount ?? 'N/A';
+							$commentCount = $json->photo->commentCount;
+							$viewCount    = $json->photo->viewCount;
+							$caption      = $json->photo->caption;
+
+							if(isset($json->atlas)) {
+								$type   = 'Pictures';
+								$cdn    = $json->atlas->cdn;
+								$domain = $cdn[array_rand($cdn, 1)];
+								$list   = $json->atlas->list;
+							} else {
+								$type = 'Video';
+								$url  = array_shift($json->photo->mainMvUrls)->url;
+							}
+
+
+							$this->getLogger()->info("获取到的的作品信息如下 (Type: §3{$type}§w):");
 							$this->getLogger()->info('----------------------------------------------------------------');
-							$this->getLogger()->info("作品ID: §3{$photo->id}§r§w | 获赞数: §7{$photo->likeCount}§r§w (§1{$realLikeCount}§r§w) | 共计观看次数: §7{$photo->viewCount}");
-							$this->getLogger()->info("作者ID: §3{$author->id}§r§w | 显示名称: §3{$author->name}");
-							$this->getLogger()->info('文章标题及标签: §5' . str_replace("\n", '  ', $photo->caption));
+							$this->getLogger()->info("作者ID: §3{$userId}§r§w | 原始ID: §3{$originalId}§r§w | 快手号: §3{$kwaiId}§r§w | 显示名称: §3{$userName}");
+							$this->getLogger()->info("粉丝数: §3{$fansCount}§r§w | 关注数: §3{$followCount}§r§w | 已发布的作品: §3{$photoCount}");
+							$this->getLogger()->info("作品ID: §3{$photoId}§r§w | 获赞数: §7{$likeCount}§r§w | 共计观看次数: §7{$viewCount}§r§w | 评论数: §7{$commentCount}§r§w | 分享数: §7{$shareCount}");
+							$this->getLogger()->info('文章标题及标签: §5' . str_replace("\n", '  ', $caption));
 							$this->getLogger()->info('----------------------------------------------------------------');
 
 							if($autoDownload) {
-								$savePath = SAVE_PATH . $author->id . DIRECTORY_SEPARATOR;
-								$this->download($photo->photoUrl, $savePath);
+								$savePath = SAVE_PATH . $userId . DIRECTORY_SEPARATOR;
+								if($type === 'Video') {
+									$this->download($url, $savePath);
+								} else {
+									$this->getLogger()->info('共计 ' . count($list) . ' 张图片!');
+									foreach($list as $url) {
+										$this->download("https://{$domain}{$url}", $savePath . $photoId . DIRECTORY_SEPARATOR);
+									}
+								}
 								system('start ' . $savePath);
 							}
 						}
 					} else {
-						$this->getLogger()->error('无法找到有效的数据.');
+						$this->getLogger()->error('无法找到有效的数据, 请检查分享ID是否有效.');
 					}
 				}
 			return true;
