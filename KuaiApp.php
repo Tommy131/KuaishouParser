@@ -89,7 +89,7 @@ class KuaiApp extends \owoframe\application\AppBase
 
 	public static function getVersion(): string
 	{
-		return '1.0.1';
+		return '1.0.2';
 	}
 }
 ?>

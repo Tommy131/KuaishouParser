@@ -15,6 +15,7 @@
 	* GitHub:    https://github.com/Tommy131
 
 **********************************************************************/
+declare(strict_types=1);
 namespace application\kuai\command;
 
 use application\kuai\KuaiApp;
@@ -407,7 +408,7 @@ class KuaiCommand extends \owoframe\console\CommandBase
 									$cookies = $curl->getCookies();
 									$web_ph  = $cookies[$web_ph_tag];
 								} else {
-									$operation = $this->getOperation();
+									$operation = self::getOperation();
 									$operation->setPlatform($platform);
 									$object = $this->Graphql($this)->setOperationName($operation->getName('login'))->setQuery($operation->getQuery('login'));
 									$object->setVariables(['userLoginInfo' => ['authToken' => $authToken, 'sid' => $sid]]);
