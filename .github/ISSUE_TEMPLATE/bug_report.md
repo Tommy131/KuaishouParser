@@ -26,7 +26,7 @@ Please post your issue in the format below.
 #### Your server operating environment:
 > --- Environment description (e.g. below) ---
 System: Linux/CentOS 7.x
-OwO-Version: Development(dev@v1.0.0)
+OwO-Version: Development(v1.0.3-dev)
 Web Environment:
     - Nginx 1.18.0
     - PHP 7.4

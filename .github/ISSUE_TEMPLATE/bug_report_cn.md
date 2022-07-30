@@ -26,8 +26,8 @@ assignees: Tommy131
 #### 您的服务器运行环境
 > --- 服务器环境描述(例如下方) ---
 系统: Linux/CentOS 7.x
-OwO版本: 开发版(dev@v1.0.0)
-web环境: 
+OwO版本: 开发版(v1.0.3-dev)
+web环境:
     - Nginx 1.18.0
     - PHP 7.4
     - MySQL 5.7
