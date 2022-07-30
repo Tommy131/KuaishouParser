@@ -20,6 +20,7 @@ namespace application\kuai\command;
 use application\kuai\KuaiApp;
 use owoframe\helper\Helper;
 use owoframe\exception\OwOFrameException;
+use owoframe\object\JSON;
 use owoframe\utils\Curl;
 
 class KuaiCommand extends \owoframe\console\CommandBase
@@ -131,7 +132,7 @@ class KuaiCommand extends \owoframe\console\CommandBase
 		$result = $object->sendQuery(self::GRAPHQL_LIVE, $cookie_live)->getResult();
 		$result = $result->privateFeeds->list ?? null;
 
-		if(is_null($result)) {
+		if(is_null($result) || (count($result) == 0)) {
 			$this->getLogger()->error('[0x003] 请求失败, 请稍后重试.');
 			return true;
 		}
@@ -144,7 +145,9 @@ class KuaiCommand extends \owoframe\console\CommandBase
 		foreach($result as $k => $article) {
 			$location      = $article->location ?? 'N/A';
 			$coordinate    = ($location !== 'N/A') ? "{$location->longitude}° {$location->latitude}°" : '';
-			$location      = ($location !== 'N/A') ? "§2{$article->location->address} §w(在 §2{$article->location->city}§w 标注了 §4{$article->location->title}" : '无';
+			$address       = $article->location->address ?? 'N/A';
+			$city          = $article->location->city ?? 'N/A';
+			$location      = ($location !== 'N/A') ? "§2{$address} §w(在 §2{$city}§w 标注了 §4{$article->location->title})" : '无';
 			$uploadTime    = date('Y-m-d H:i:s', $article->timestamp / 1000);
 			$allowComments = $article->onlyFollowerCanComment ? '§1仅允许关注者评论' : '§5允许';
 
@@ -209,6 +212,18 @@ class KuaiCommand extends \owoframe\console\CommandBase
 	 */
 	private function interceptParameters(array $params, bool $autoDownload = false) : bool
 	{
+		$headers = [
+			'Content-Type: application/x-www-form-urlencoded; charset=UTF-8',
+			'Accept: */*',
+			'Accept-Language: zh-CN,zh;q=0.8,zh-TW;q=0.7,zh-HK;q=0.5,en-US;q=0.3,en;q=0.2',
+			'Connection: keep-alive',
+			'Origin: https://live.kuaishou.com',
+			'Sec-Fetch-Dest: empty',
+			'Sec-Fetch-Mode: cors',
+			'Sec-Fetch-Site: same-site',
+			'Pragma: no-cache',
+			'Cache-Control: no-cache',
+		];
 		switch(array_shift($params)) {
 			case 'shareId':
 				$shareId = array_shift($params) ?? null;
@@ -250,8 +265,172 @@ class KuaiCommand extends \owoframe\console\CommandBase
 						$this->getLogger()->error('无法找到有效的数据.');
 					}
 				}
-				return true;
-			break;
+			return true;
+
+			case '--login':
+
+				$baseUrl     = 'https://id.kuaishou.com/rest/c/infra/ks/qr/';
+				$loginUrl    = $baseUrl . 'start';
+				$resultUrl   = $baseUrl . 'scanResult';
+				$acceptUrl   = $baseUrl . 'acceptResult';
+				$callbackUrl = 'https://id.kuaishou.com/pass/kuaishou/login/qr/callback';
+				$list        = [
+					'live' => 'kuaishou.live.web',
+					'www'  => 'kuaishou.server.web'
+				];
+
+				$platform = array_shift($params) ?? 'www';
+				$platform = strtolower($platform);
+				if(!isset($list[$platform])) {
+					$this->getLogger()->error('不支持的平台!');
+					return true;
+				}
+				$sid = $list[$platform];
+
+				$verifyResultCode = function(int $code) {return $code === 1;};
+
+				$this->getLogger()->info('正在登录到平台: §3' . $sid);
+
+				$curl = $this->initCurl()->userAgentInPC()->setUrl($loginUrl)->setHeader($headers)->setPostData(['sid' => $sid])->exec();
+				$_ = $curl->decodeWithJson(false);
+
+				if(is_array($_) && $verifyResultCode($_['result'])) {
+					extract($_);
+
+					$tmpPath    = SAVE_PATH . 'login_temp' . DIRECTORY_SEPARATOR;
+					$nameFormat = 'login_QRCode_%s.png';
+					if(!is_dir($tmpPath)) mkdir($tmpPath, 755, true);
+
+					// 写入二维码到文件;
+					$path = $tmpPath . sprintf($nameFormat, 'www');
+					if(is_file($path)) unlink($path);
+					file_put_contents($path, base64_decode($imageData));
+
+					if(Helper::getOS() === 'windows') {
+						system('start ' . $path);
+					} else {
+						$this->getLogger()->info("二维码已保存在路径 '{$path}' 中, 请手动打开此文件.");
+					}
+					$this->getLogger()->info("当前Token: §2qrLoginToken=§6{$qrLoginToken}§w|§2qrLoginSignature=§6{$qrLoginSignature}");
+
+					ask('请打开快手客户端扫码, 不要点击确定登录!!! 不要点击确定登录!!! 不要点击确定登录!!! 完成操作请回车:', 'OK', true, 'warning');
+					if(microtime(true) > round($expireTime / 1000, 3)) {
+						$this->getLogger()->error('二维码已失效, 请重试.');
+						return true;
+					}
+
+					$baseData = [
+						'channelType'      => $channelType ?? 'UNKNOWN',
+						'encryptHeaders'   => $encryptHeaders ?? ''
+					];
+
+					$curl = $this->initCurl()->userAgentInPC()->setUrl($resultUrl)->setHeader($headers)->setPostData($postData = array_merge($baseData, [
+						'qrLoginToken'     => $qrLoginToken ?? 'UNKNOWN',
+						'qrLoginSignature' => $qrLoginSignature ?? 'UNKNOWN',
+					]))->exec();
+					$_ = $curl->decodeWithJson();
+
+					if(is_object($_) && $verifyResultCode($_->result)) {
+						$eid     = $_->user->eid;
+						$version = KuaiApp::getVersion();
+						$this->getLogger()->info("欢迎使用 [KuaishouParser v{$version}]! GitHub: https://github.com/Tommy131/KuaishouParser");
+						$this->getLogger()->info("如果本程序有帮到你, 请给此项目一个Star以鼓励我继续开发 :)\n");
+						$this->getLogger()->success("登录成功! 欢迎你, §6{$_->user->user_name} §w[§3eid:§7{$eid}§w]§5!\n");
+
+						ask('现在请点击授权登录! 完成操作请回车:', 'OK', true, 'notice');
+						$curl = $this->initCurl()->userAgentInPC()->setUrl($acceptUrl)->setHeader($headers)->setPostData(array_merge($postData, ['sid' => $sid]))->exec();
+						$_    = $curl->decodeWithJson();
+
+						if(is_object($_) && $verifyResultCode($_->result)) {
+							$curl = $this->initCurl()->userAgentInPC()->setUrl($callbackUrl)->setHeader($headers)->setPostData(array_merge($baseData, ['sid' => $sid, 'qrToken' => $_->qrToken]))->exec();
+							$_    = $curl->decodeWithJson(false);
+
+							$web_ph_tag = 'kuaishou.%s.web_ph';
+							$web_ph_tag = sprintf($web_ph_tag, ($platform === 'www') ? 'server' : 'live');
+
+							$web_st_tag = 'kuaishou.%s.web_st';
+							$web_st_tag = sprintf($web_st_tag, ($platform === 'www') ? 'server' : 'live');
+
+							$userId     = $_['userId'];
+							$web_st     = $_[$web_st_tag];
+
+							$web_at_tag = 'kuaishou.%s.web.at';
+							$web_at_tag = sprintf($web_at_tag, ($platform === 'www') ? 'server' : 'live');
+							$authToken  = $_[$web_at_tag];
+
+							if(is_array($_) && $verifyResultCode($_['result'])) {
+								// 获取 web_ph;
+								$domainName = ($platform === 'live') ? 'kuaishoupay' : 'kuaishou';
+								$curl = $this->initCurl()->userAgentInPC()->setUrl("https://www.{$domainName}.com/rest/infra/sts")->setHeader($headers)->returnHeader(true)->setPostData([
+									'authToken' => $authToken,
+									'sid' => $sid
+								])->exec();
+								$cookies = $curl->getCookies();
+								$web_ph  = $cookies[$web_ph_tag];
+
+								$cookies = [
+									'clientKey' => '65890b29',
+									'userId'    => $userId,
+									$web_st_tag => $web_st,
+									$web_ph_tag => $web_ph
+								];
+
+								// 获取did;
+								$curl    = $this->initCurl()->userAgentInPC()->setUrl("https://{$platform}.kuaishou.com/profile/{$eid}")->setHeader($headers)->returnHeader(true)->setCookies($cookies)->exec();
+								$cookies = array_merge($cookies, $curl->getCookies());
+
+								$operation = $this->getOperation();
+								$operation->setPlatform($platform);
+								$object = $this->Graphql($this)->setOperationName($operation->getName('login'))->setQuery($operation->getQuery('login'));
+
+								if($platform === 'live') {
+									$object->setVariables(['userLoginInfo' => json_encode(['authToken' => $authToken, 'sid' => $sid])]);
+									$url = self::GRAPHQL_LIVE;
+								} else {
+									$url = self::GRAPHQL_WWW;
+								}
+								$result = $object->sendQuery($url, KuaiApp::getCookies($platform))->getResult();
+
+								$cookiesStr = '';
+
+								foreach($cookies as $k => $v) {
+									$cookiesStr .= "{$k}={$v}; ";
+								}
+								$cookiesStr = trim($cookiesStr, '; ');
+								$config = new JSON(KuaiApp::getAppPath() . 'config.json');
+								$config->set("cookies.{$platform}", $cookiesStr);
+								$config->save();
+								$this->getLogger()->success("已成功更新本地Cookies! §wPlatform: {$platform}");
+							}
+						} else {
+							$this->getLogger()->error('请授权登录!');
+							return true;
+						}
+					} else {
+						$msg = (isset($_->result) && ($_->result === 707)) ? '是不是手速太快已经点了授权登录? 请重试.' : '请扫描二维码!';
+						$this->getLogger()->error($msg);
+					}
+				} else {
+					$this->getLogger()->error('请求超时, 请重试.');
+					return true;
+				}
+			return true;
+
+			case '--logout':
+				$list = [
+					'live' => 'kuaishou.live.web',
+					'www'  => 'kuaishou.server.web'
+				];
+
+				$platform = array_shift($params) ?? 'www';
+				$platform = strtolower($platform);
+				if(!isset($list[$platform])) {
+					$this->getLogger()->error('不支持的平台!');
+					return true;
+				}
+				$sid  = $list[$platform];
+				$curl = $this->initCurl()->userAgentInPC()->setUrl('https://id.kuaishou.com/pass/kuaishou/login/logout')->setPostData(['sid' => $sid])->returnHeader(true)->setCookiesInRaw(KuaiApp::getCookies($platform))->exec();
+			return true;
 		}
 		return false;
 	}
@@ -279,6 +458,10 @@ class KuaiCommand extends \owoframe\console\CommandBase
 				'searchEID' => [
 					'www' => 'graphqlSearchUser',
 					'www2' => 'visionVideoDetail'
+				],
+				'login' => [
+					'www'  => 'userInfoQuery',
+					'live' => 'UserLogin'
 				]
 			];
 
@@ -302,6 +485,10 @@ class KuaiCommand extends \owoframe\console\CommandBase
 					'searchEID' => [
 						'www' => file_get_contents($appPath . 'graphqlSearchUser.graphql'),
 						'www2' => file_get_contents($appPath . 'visionVideoDetail.graphql')
+					],
+					'login' => [
+						'www'  => file_get_contents($appPath . 'UserLoginServer.graphql'),
+						'live' => file_get_contents($appPath . 'UserLoginLive.graphql')
 					]
 				];
 				return $query[$type][$this->platform] ?? null;
@@ -326,33 +513,37 @@ class KuaiCommand extends \owoframe\console\CommandBase
 		return new class($this)
 		{
 			private $command;
+			private $curl;
 
 			/* 原始数据 */
 			public $encoded = '';
 			public $operationName, $query = '';
 			public $variables = [];
 
+			public $beforeRequestCallback;
+
 			/* 处理结果 */
-			public $result = null;
+			public $headers = '';
+			public $result  = null;
 
 			public function __construct(KuaiCommand $command)
 			{
 				$this->command = $command;
 			}
 
-			public function setOperationName(string $name)
+			public function setOperationName(string $name) : object
 			{
 				$this->operationName = $name;
 				return $this;
 			}
 
-			public function setVariables(array $variables)
+			public function setVariables(array $variables) : object
 			{
 				$this->variables = array_merge($variables, $this->variables);
 				return $this;
 			}
 
-			public function setQuery(string $query)
+			public function setQuery(string $query) : object
 			{
 				$this->query = $query;
 				return $this;
@@ -362,15 +553,20 @@ class KuaiCommand extends \owoframe\console\CommandBase
 			{
 				return $this->encoded = json_encode([
 					'operationName' => $this->operationName,
-					'variables'     => $this->variables,
+					'variables'     => $this->variables ?? [],
 					'query'         => $this->query
 				]);
 			}
 
-			public function sendQuery(string $url, string $cookie = '', int $timeout = 60)
+			public function sendQuery(string $url, string $cookie = '', int $timeout = 60) : object
 			{
-				$curl    = $this->command->initCurl()->setUrl($url)->setTimeOut($timeout)->setCookiesInRaw($cookie);
-				$content = $curl->setPostDataRaw($this->encode())->exec()->getContent();
+				$this->curl = $this->command->initCurl()->setUrl($url)->setTimeOut($timeout)->setCookiesInRaw($cookie);
+
+				if(is_callable($this->beforeRequestCallback)) {
+					call_user_func_array($this->beforeRequestCallback, [$this->curl]);
+				}
+
+				$content = $this->curl->setPostDataRaw($this->encode())->exec()->getContent($this->headers);
 
 				if(!is_bool($content)) {
 					$content = json_decode($content);
@@ -387,6 +583,11 @@ class KuaiCommand extends \owoframe\console\CommandBase
 					$this->result = $this->result->data;
 				}
 				return $this->result ?? null;
+			}
+
+			public function getCurl() : Curl
+			{
+				return $this->curl;
 			}
 		};
 	}
