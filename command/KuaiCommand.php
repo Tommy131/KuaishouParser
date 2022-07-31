@@ -145,7 +145,7 @@ class KuaiCommand extends \owoframe\console\CommandBase
 			$coordinate    = ($location !== 'N/A') ? "{$location->longitude}° {$location->latitude}°" : '';
 			$address       = $article->location->address ?? 'N/A';
 			$city          = $article->location->city ?? 'N/A';
-			$location      = ($location !== 'N/A') ? "§2{$address} §w(在 §2{$city}§w 标注了 §4{$article->location->title})" : '无';
+			$location      = ($location !== 'N/A') ? "§2{$address} §w(在 §2{$city}§w 标注了 §4{$article->location->title}§w)" : '无';
 			$uploadTime    = date('Y-m-d H:i:s', (int) ($article->timestamp / 1000));
 			$allowComments = $article->onlyFollowerCanComment ? '§1仅允许关注者评论' : '§5允许';
 
@@ -170,7 +170,7 @@ class KuaiCommand extends \owoframe\console\CommandBase
 			$this->getLogger()->info("获赞数: §7{$article->counts->displayLike}§r§w (§1{$realLikeCount}§r§w) | 共计观看次数: §7{$article->counts->displayView}");
 			$this->getLogger()->info('文章标题及标签: §g' . str_replace("\n", '  ', $article->caption));
 
-			if($article->workType === 'vertical') {
+			if(in_array($article->workType, ['single', 'vertical', 'multiple'])) {
 				$imgUrls = $article->imgUrls;
 				$this->getLogger()->info('共计 §1' . count($imgUrls). '§w 张图片!');
 
