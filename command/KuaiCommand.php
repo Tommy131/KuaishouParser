@@ -19,16 +19,13 @@ declare(strict_types=1);
 namespace application\kuai\command;
 
 use application\kuai\KuaiApp;
+use application\kuai\sdk\Url;
 use owoframe\helper\Helper;
 use owoframe\exception\OwOFrameException;
-use owoframe\object\JSON;
 use owoframe\utils\Curl;
 
 class KuaiCommand extends \owoframe\console\CommandBase
 {
-	public const GRAPHQL_LIVE = 'https://live.kuaishou.com/live_graphql';
-	public const GRAPHQL_WWW = 'https://www.kuaishou.com/graphql';
-
 
 	public function execute(array $params) : bool
 	{
@@ -77,7 +74,7 @@ class KuaiCommand extends \owoframe\console\CommandBase
 		$this->getLogger()->info("正在查询......");
 
 		$object = $this->Graphql($this)->setOperationName($operation->getName('searchEID'))->setVariables(['keyword' => $userId])->setQuery($operation->getQuery('searchEID'));
-		$result = $object->sendQuery(self::GRAPHQL_WWW, $cookie_www)->getResult();
+		$result = $object->sendQuery(Url::GRAPHQL_WWW, $cookie_www)->getResult();
 		$result = $result->visionSearchUser ?? null;
 
 		if(!is_null($result)) {
@@ -89,7 +86,7 @@ class KuaiCommand extends \owoframe\console\CommandBase
 		}
 
 		$object = $this->Graphql($this)->setOperationName($operation->getName('authorData'))->setVariables(['userId' => $userId])->setQuery($operation->getQuery('authorData'));
-		$result = $object->sendQuery(self::GRAPHQL_WWW, $cookie_www)->getResult();
+		$result = $object->sendQuery(Url::GRAPHQL_WWW, $cookie_www)->getResult();
 		$result = $result->visionProfile->userProfile ?? null;
 
 		if(is_null($result)) {
@@ -103,7 +100,7 @@ class KuaiCommand extends \owoframe\console\CommandBase
 
 		$operation->setPlatform('live');
 		$object = $this->Graphql($this)->setOperationName($operation->getName('authorData'))->setVariables(['userId' => $userId])->setQuery($operation->getQuery('authorData'));
-		$result = $object->sendQuery(self::GRAPHQL_LIVE, $cookie_live)->getResult();
+		$result = $object->sendQuery(Url::GRAPHQL_LIVE, $cookie_live)->getResult();
 		$result = $result->sensitiveUserInfo ?? null;
 
 		if(is_null($result)) {
@@ -130,7 +127,7 @@ class KuaiCommand extends \owoframe\console\CommandBase
 
 		$operation->setPlatform('live');
 		$object = $this->Graphql($this)->setOperationName($operation->getName('articleData'))->setVariables(['userId' => $userId, 'count' => $articleCount])->setQuery($operation->getQuery('articleData'));
-		$result = $object->sendQuery(self::GRAPHQL_LIVE, $cookie_live)->getResult();
+		$result = $object->sendQuery(Url::GRAPHQL_LIVE, $cookie_live)->getResult();
 		$result = $result->privateFeeds->list ?? null;
 
 		if(is_null($result) || (count($result) == 0)) {
@@ -149,13 +146,13 @@ class KuaiCommand extends \owoframe\console\CommandBase
 			$address       = $article->location->address ?? 'N/A';
 			$city          = $article->location->city ?? 'N/A';
 			$location      = ($location !== 'N/A') ? "§2{$address} §w(在 §2{$city}§w 标注了 §4{$article->location->title})" : '无';
-			$uploadTime    = date('Y-m-d H:i:s', $article->timestamp / 1000);
+			$uploadTime    = date('Y-m-d H:i:s', (int) ($article->timestamp / 1000));
 			$allowComments = $article->onlyFollowerCanComment ? '§1仅允许关注者评论' : '§5允许';
 
 			// ~单个作品的详细数据查询;
 			$operation->setPlatform('www');
 			$object = $this->Graphql($this)->setOperationName($operation->getName('articleData'))->setVariables(['photoId' => $article->id])->setQuery($operation->getQuery('articleData'));
-			$result = $object->sendQuery(self::GRAPHQL_WWW, $cookie_www)->getResult();
+			$result = $object->sendQuery(Url::GRAPHQL_WWW, $cookie_www)->getResult();
 			$result = $result->visionVideoDetail ?? null;
 
 			if(is_null($result)) {
@@ -231,16 +228,22 @@ class KuaiCommand extends \owoframe\console\CommandBase
 					$this->getLogger()->error('无效的分享ID! 请检查是否正确输入.');
 				} else {
 					$this->getLogger()->info("正在解析单个分享作品 [§2shareId§w=§3{$shareId}§w] ......");
-					$this->initCurl()->returnHeader(true)->setUrl('https://v.kuaishou.com/' . $shareId)->exec()->getContent($h);
-					if(($h !== '') && preg_match('/^Location: (.*)$/imU', $h, $match)) {
+
+					$url = 'https://v.kuaishou.com/';
+					if(!is_null($_t = array_shift($params)) && (strtolower($_t) === '--mode_pc')) {
+						$url = 'https://www.kuaishou.com/f/';
+						$this->getLogger()->notice("分享平台解析模式已定向至 [PC]");
+					}
+
+					$this->initCurl()->returnHeader(true)->setUrl($url . $shareId)->exec()->getContent($h);
+					if(preg_match('/^Location: (.*)$/imU', $h, $match)) {
 						$result  = parse_url($match[1]);
 						$photoId = $result['path'] ?? null;
 
 						if(!is_null($photoId)) {
 							$photoId = @end(explode('/', $result['path']));
 
-							$url  = 'https://v.m.chenzhongtech.com/rest/wd/photo/info';
-							$curl = $this->initCurl()->setUrl($url)->setPostData(['photoId' => $photoId], true)->setCookiesInRaw('did=web_')->setHeader([
+							$curl = $this->initCurl()->setUrl(Url::ARTICLE_DATA)->setPostData(['photoId' => $photoId], true)->setCookiesInRaw('did=web_')->setHeader([
 								'Content-Type: application/json; charset=UTF-8',
 								'Referer: ' . $match[1]
 							])->exec();
@@ -308,11 +311,9 @@ class KuaiCommand extends \owoframe\console\CommandBase
 
 			case '--login':
 
-				$baseUrl     = 'https://id.kuaishou.com/rest/c/infra/ks/qr/';
-				$loginUrl    = $baseUrl . 'start';
-				$resultUrl   = $baseUrl . 'scanResult';
-				$acceptUrl   = $baseUrl . 'acceptResult';
-				$callbackUrl = 'https://id.kuaishou.com/pass/kuaishou/login/qr/callback';
+				$loginUrl    = Url::QR_CODE_LOGIN . 'start';
+				$resultUrl   = Url::QR_CODE_LOGIN . 'scanResult';
+				$acceptUrl   = Url::QR_CODE_LOGIN . 'acceptResult';
 				$list        = [
 					'live' => 'kuaishou.live.web',
 					'www'  => 'kuaishou.server.web'
@@ -331,7 +332,7 @@ class KuaiCommand extends \owoframe\console\CommandBase
 
 				$this->getLogger()->info('正在登录到平台: §3' . $sid);
 
-				$curl = $this->initCurl()->userAgentInPC()->setUrl($loginUrl)->setHeader($headers)->setPostData(['sid' => $sid])->exec();
+				$curl = $this->initCurl()->setUrl($loginUrl)->setHeader($headers)->setPostData(['sid' => $sid])->exec();
 				$_ = $curl->decodeWithJson(false);
 
 				if(is_array($_) && $verifyResultCode($_['result'])) {
@@ -364,7 +365,7 @@ class KuaiCommand extends \owoframe\console\CommandBase
 						'encryptHeaders'   => $encryptHeaders ?? ''
 					];
 
-					$curl = $this->initCurl()->userAgentInPC()->setUrl($resultUrl)->setHeader($headers)->setPostData($postData = array_merge($baseData, [
+					$curl = $this->initCurl()->setUrl($resultUrl)->setHeader($headers)->setPostData($postData = array_merge($baseData, [
 						'qrLoginToken'     => $qrLoginToken ?? 'UNKNOWN',
 						'qrLoginSignature' => $qrLoginSignature ?? 'UNKNOWN',
 					]))->exec();
@@ -378,11 +379,11 @@ class KuaiCommand extends \owoframe\console\CommandBase
 						$this->getLogger()->success("登录成功! 欢迎你, §6{$_->user->user_name} §w[§3eid:§7{$eid}§w]§5!\n");
 
 						ask('现在请点击授权登录! 完成操作请回车 [ENTER]:', 'OK', true, 'notice');
-						$curl = $this->initCurl()->userAgentInPC()->setUrl($acceptUrl)->setHeader($headers)->setPostData(array_merge($postData, ['sid' => $sid]))->exec();
+						$curl = $this->initCurl()->setUrl($acceptUrl)->setHeader($headers)->setPostData(array_merge($postData, ['sid' => $sid]))->exec();
 						$_    = $curl->decodeWithJson();
 
 						if(is_object($_) && $verifyResultCode($_->result)) {
-							$curl = $this->initCurl()->userAgentInPC()->setUrl($callbackUrl)->setHeader($headers)->setPostData(array_merge($baseData, ['sid' => $sid, 'qrToken' => $_->qrToken]))->exec();
+							$curl = $this->initCurl()->setUrl(Url::QR_CODE_CALLBACK)->setHeader($headers)->setPostData(array_merge($baseData, ['sid' => $sid, 'qrToken' => $_->qrToken]))->exec();
 							$_    = $curl->decodeWithJson(false);
 
 							$web_ph_tag = 'kuaishou.%s.web_ph';
@@ -401,7 +402,7 @@ class KuaiCommand extends \owoframe\console\CommandBase
 							if(is_array($_) && $verifyResultCode($_['result'])) {
 								// 获取 web_ph;
 								if($platform === 'www') {
-									$curl = $this->initCurl()->userAgentInPC()->setUrl('https://www.kuaishou.com/rest/infra/sts')->setHeader($headers)->returnHeader(true)->setPostData([
+									$curl = $this->initCurl()->setUrl(Url::WEB_PH_REQUEST)->setHeader($headers)->returnHeader(true)->setPostData([
 										'authToken' => $authToken,
 										'sid' => $sid
 									])->exec();
@@ -416,7 +417,7 @@ class KuaiCommand extends \owoframe\console\CommandBase
 										$curl->returnHeader(true);
 									};
 
-									$result = $object->sendQuery(self::GRAPHQL_LIVE)->getResult();
+									$result = $object->sendQuery(Url::GRAPHQL_LIVE)->getResult();
 									$result = $result->webLogin->result ?? false;
 									if($result !== 1) {
 										$this->getLogger()->error('登录出错啦, 该账号可能已经登录过了, 请在服务器会话过期之前换一个账号试一下吧~');
@@ -435,7 +436,7 @@ class KuaiCommand extends \owoframe\console\CommandBase
 								];
 
 								// 获取did;
-								$curl    = $this->initCurl()->userAgentInPC()->setUrl("https://{$platform}.kuaishou.com/profile/{$eid}")->setHeader($headers)->returnHeader(true)->setCookies($commonCookies)->exec();
+								$curl    = $this->initCurl()->setUrl("https://{$platform}.kuaishou.com/profile/{$eid}")->setHeader($headers)->returnHeader(true)->setCookies($commonCookies)->exec();
 								$cookies = $curl->getCookies();
 								if(empty($cookies)) {
 									$this->getLogger()->error('Cookies获取异常, 请重试.');
@@ -449,9 +450,8 @@ class KuaiCommand extends \owoframe\console\CommandBase
 									$cookiesStr .= "{$k}={$v}; ";
 								}
 								$cookiesStr = trim($cookiesStr, '; ');
-								$config = new JSON(KuaiApp::getAppPath() . 'config.json');
-								$config->set("cookies.{$platform}", $cookiesStr);
-								$config->save();
+								KuaiApp::getConfig()->set("cookies.{$platform}", $cookiesStr);
+								KuaiApp::getConfig()->save();
 								$this->getLogger()->success("已成功更新本地Cookies! §wPlatform: {$platform}");
 							}
 						} else {
@@ -481,13 +481,11 @@ class KuaiCommand extends \owoframe\console\CommandBase
 					return true;
 				}
 				$sid  = $list[$platform];
-				$curl = $this->initCurl()->userAgentInPC()->setUrl('https://id.kuaishou.com/pass/kuaishou/login/logout')->setPostData(['sid' => $sid], true)->returnHeader(true)->setCookiesInRaw(KuaiApp::getCookies($platform))->exec();
+				$curl = $this->initCurl()->setUrl(Url::LOGOUT)->setHeader($headers)->setPostData(['sid' => $sid])->returnHeader(true)->setCookiesInRaw(KuaiApp::getCookies($platform))->exec();
 				$____ = json_decode($curl->getContent());
-
 				if($____->result === 1) {
-					$config = new JSON(KuaiApp::getAppPath() . 'config.json');
-					$config->set("cookies.{$platform}", '(cookies: string)');
-					$config->save();
+					KuaiApp::getConfig()->set("cookies.{$platform}", '(cookies: string)');
+					KuaiApp::getConfig()->save();
 					$this->getLogger()->info('退出成功.');
 				}
 			return true;
@@ -619,7 +617,7 @@ class KuaiCommand extends \owoframe\console\CommandBase
 
 			public function sendQuery(string $url, string $cookie = '', int $timeout = 60) : object
 			{
-				$this->curl = $this->curl->setUrl($url)->setCookiesInRaw($cookie)->setTimeOut($timeout);
+				$this->curl = $this->curl->setUrl($url)->setCookiesInRaw($cookie)->setTimeOut($timeout)->setHeader(['Content-Type: application/json; charset=UTF-8']);
 
 				if(is_callable($this->beforeRequestCallback)) {
 					call_user_func_array($this->beforeRequestCallback, [$this->curl]);
@@ -674,7 +672,7 @@ class KuaiCommand extends \owoframe\console\CommandBase
 		}
 
 		// 检测是否开启了代理;
-		if(KuaiApp::useProxyServer('status')) {
+		if(KuaiApp::isProxyOn()) {
 			$array = KuaiApp::useProxyServer('data');
 			$curl->useProxy($array[0], $array[1]);
 		}
