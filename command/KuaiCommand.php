@@ -141,6 +141,10 @@ class KuaiCommand extends \owoframe\console\CommandBase
 
 		$authorPath = $savePath . $userId . DIRECTORY_SEPARATOR;
 		foreach($result as $k => $article) {
+
+			// 跳过错误的时间戳: 可能为直播;
+			if($article->timestamp === null) continue;
+
 			$location      = $article->location ?? 'N/A';
 			$coordinate    = ($location !== 'N/A') ? "{$location->longitude}° {$location->latitude}°" : '';
 			$address       = $article->location->address ?? 'N/A';
