@@ -31,10 +31,6 @@ class KuaiApp extends \owoframe\application\AppBase
 			define('SAVE_PATH', STORAGE_A_PATH . 'kuaiApp' . DIRECTORY_SEPARATOR); // 默认将解析到的作品资源保存在框架的资源存储文件目录下;
 		}
 		MasterManager::getInstance()->getUnit('console')->registerCommand(KuaiCommand::getName(), KuaiCommand::class);
-
-		if(self::isProxyOn()) {
-			MasterManager::_getUnit('logger')->notice('[KuaiApp] 代理服务已开启!');
-		}
 	}
 
 	public static function isCLIOnly() : bool

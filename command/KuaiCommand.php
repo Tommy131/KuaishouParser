@@ -34,6 +34,10 @@ class KuaiCommand extends \owoframe\console\CommandBase
 		}
 		$savePath = SAVE_PATH;
 
+		if(KuaiApp::isProxyOn()) {
+			$this->getLogger()->notice('[KuaiApp] 代理服务已开启!');
+		}
+
 		#--------------------------------------------------------------------------#
 
 		// ~自动下载作品选项;
