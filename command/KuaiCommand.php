@@ -537,23 +537,27 @@ class KuaiCommand extends \owoframe\console\CommandBase
 				$appPath = KuaiApp::getAppPath() . 'graphql' . DIRECTORY_SEPARATOR;
 				$query = [
 					'authorData' => [
-						'www'  => file_get_contents($appPath . 'visionProfile.graphql'),
-						'live' => file_get_contents($appPath . 'sensitiveUserInfoQuery.graphql')
+						'www'  => 'visionProfile.graphql',
+						'live' => 'sensitiveUserInfoQuery.graphql'
 					],
 					'articleData' => [
-						'www'  => file_get_contents($appPath . 'getRealVideoUrl.graphql'),
-						'live' => file_get_contents($appPath . 'privateFeedsQuery.graphql')
+						'www'  => 'getRealVideoUrl.graphql',
+						'live' => 'privateFeedsQuery.graphql'
 					],
 					'searchEID' => [
-						'www' => file_get_contents($appPath . 'graphqlSearchUser.graphql'),
-						'www2' => file_get_contents($appPath . 'visionVideoDetail.graphql')
+						'www' => 'graphqlSearchUser.graphql',
+						'www2' => 'visionVideoDetail.graphql'
 					],
 					'login' => [
-						'www'  => file_get_contents($appPath . 'UserLoginServer.graphql'),
-						'live' => file_get_contents($appPath . 'UserLoginLive.graphql')
+						'www'  => 'UserLoginServer.graphql',
+						'live' => 'UserLoginLive.graphql'
 					]
 				];
-				return $query[$type][$this->platform] ?? null;
+				$query = $query[$type][$this->platform] ?? null;
+				if(!is_null($query) && is_file($file = $appPath . $query)) {
+					$query = file_get_contents($file);
+				}
+				return $query;
 			}
 
 			public function setPlatform(string $platform = 'www') : void
