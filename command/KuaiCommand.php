@@ -19,7 +19,7 @@ declare(strict_types=1);
 namespace application\kuai\command;
 
 use application\kuai\KuaiApp;
-use application\kuai\sdk\Url;
+use application\kuai\api\{Graphql, Url};
 use owoframe\helper\Helper;
 use owoframe\exception\OwOFrameException;
 use owoframe\utils\Curl;
@@ -77,7 +77,7 @@ class KuaiCommand extends \owoframe\console\CommandBase
 		$this->getLogger()->notice("登录后在浏览器控制台 (§wF12§6) 中输入 `§3document.cookie§6` 即可获取Cookie.");
 		$this->getLogger()->info("正在查询......");
 
-		$object = $this->Graphql($this)->setOperationName($operation->getName('searchEID'))->setVariables(['keyword' => $userId])->setQuery($operation->getQuery('searchEID'));
+		$object = $this->Graphql()->setOperationName($operation->getName('searchEID'))->setVariables(['keyword' => $userId])->setQuery($operation->getQuery('searchEID'));
 		$result = $object->sendQuery(Url::GRAPHQL_WWW, $cookie_www)->getResult();
 		$result = $result->visionSearchUser ?? null;
 
@@ -89,7 +89,7 @@ class KuaiCommand extends \owoframe\console\CommandBase
 			}
 		}
 
-		$object = $this->Graphql($this)->setOperationName($operation->getName('authorData'))->setVariables(['userId' => $userId])->setQuery($operation->getQuery('authorData'));
+		$object = $this->Graphql()->setOperationName($operation->getName('authorData'))->setVariables(['userId' => $userId])->setQuery($operation->getQuery('authorData'));
 		$result = $object->sendQuery(Url::GRAPHQL_WWW, $cookie_www)->getResult();
 		$result = $result->visionProfile->userProfile ?? null;
 
@@ -103,7 +103,7 @@ class KuaiCommand extends \owoframe\console\CommandBase
 		$description = $result->profile->user_text;
 
 		$operation->setPlatform('live');
-		$object = $this->Graphql($this)->setOperationName($operation->getName('authorData'))->setVariables(['userId' => $userId])->setQuery($operation->getQuery('authorData'));
+		$object = $this->Graphql()->setOperationName($operation->getName('authorData'))->setVariables(['userId' => $userId])->setQuery($operation->getQuery('authorData'));
 		$result = $object->sendQuery(Url::GRAPHQL_LIVE, $cookie_live)->getResult();
 		$result = $result->sensitiveUserInfo ?? null;
 
@@ -130,7 +130,7 @@ class KuaiCommand extends \owoframe\console\CommandBase
 
 
 		$operation->setPlatform('live');
-		$object = $this->Graphql($this)->setOperationName($operation->getName('articleData'))->setVariables(['userId' => $userId, 'count' => $articleCount])->setQuery($operation->getQuery('articleData'));
+		$object = $this->Graphql()->setOperationName($operation->getName('articleData'))->setVariables(['userId' => $userId, 'count' => $articleCount])->setQuery($operation->getQuery('articleData'));
 		$result = $object->sendQuery(Url::GRAPHQL_LIVE, $cookie_live)->getResult();
 		$result = $result->privateFeeds->list ?? null;
 
@@ -159,7 +159,7 @@ class KuaiCommand extends \owoframe\console\CommandBase
 
 			// ~单个作品的详细数据查询;
 			$operation->setPlatform('www');
-			$object = $this->Graphql($this)->setOperationName($operation->getName('articleData'))->setVariables(['photoId' => $article->id])->setQuery($operation->getQuery('articleData'));
+			$object = $this->Graphql()->setOperationName($operation->getName('articleData'))->setVariables(['photoId' => $article->id])->setQuery($operation->getQuery('articleData'));
 			$result = $object->sendQuery(Url::GRAPHQL_WWW, $cookie_www)->getResult();
 			$result = $result->visionVideoDetail ?? null;
 
@@ -219,15 +219,15 @@ class KuaiCommand extends \owoframe\console\CommandBase
 	private function interceptParameters(array $params, bool $autoDownload = false) : bool
 	{
 		$headers = [
-			'Content-Type: application/x-www-form-urlencoded; charset=UTF-8',
-			'Accept: */*',
-			'Accept-Language: zh-CN,zh;q=0.8,zh-TW;q=0.7,zh-HK;q=0.5,en-US;q=0.3,en;q=0.2',
-			'Connection: keep-alive',
-			'Sec-Fetch-Dest: empty',
-			'Sec-Fetch-Mode: cors',
-			'Sec-Fetch-Site: same-site',
-			'Pragma: no-cache',
-			'Cache-Control: no-cache',
+			'Content-Type'    => 'application/x-www-form-urlencoded; charset=UTF-8',
+			'Accept'          => '*/*',
+			'Accept-Language' => 'zh-CN,zh;q=0.8,zh-TW;q=0.7,zh-HK;q=0.5,en-US;q=0.3,en;q=0.2',
+			'Connection'      => 'keep-alive',
+			'Sec-Fetch-Dest'  => 'empty',
+			'Sec-Fetch-Mode'  => 'cors',
+			'Sec-Fetch-Site'  => 'same-site',
+			'Pragma'          => 'no-cache',
+			'Cache-Control'   => 'no-cache'
 		];
 		switch(array_shift($params)) {
 			case 'shareId':
@@ -251,10 +251,12 @@ class KuaiCommand extends \owoframe\console\CommandBase
 						if(!is_null($photoId)) {
 							$photoId = @end(explode('/', $result['path']));
 
-							$curl = $this->initCurl()->setUrl(Url::ARTICLE_DATA)->setPostData(['photoId' => $photoId], true)->setCookiesInRaw('did=web_')->setHeader([
-								'Content-Type: application/json; charset=UTF-8',
-								'Referer: ' . $match[1]
-							])->exec();
+							$curl = $this->initCurl()
+								->setUrl(Url::ARTICLE_DATA)
+								->setPostData(['photoId' => $photoId], true)
+								->setCookiesInRaw('did=web_')
+								->setContentType('application/json; charset=UTF-8')
+								->setReferer($match[1])->exec();
 
 							$json = $curl->decodeWithJson(true);
 							if($json->result !== 1) {
@@ -340,7 +342,7 @@ class KuaiCommand extends \owoframe\console\CommandBase
 
 				$this->getLogger()->info('正在登录到平台: §3' . $sid);
 
-				$curl = $this->initCurl()->setUrl($loginUrl)->setHeader($headers)->setPostData(['sid' => $sid])->exec();
+				$curl = $this->initCurl()->setUrl($loginUrl)->setHeaders($headers)->setPostData(['sid' => $sid])->exec();
 				$_ = $curl->decodeWithJson(false);
 
 				if(is_array($_) && $verifyResultCode($_['result'])) {
@@ -373,7 +375,7 @@ class KuaiCommand extends \owoframe\console\CommandBase
 						'encryptHeaders'   => $encryptHeaders ?? ''
 					];
 
-					$curl = $this->initCurl()->setUrl($resultUrl)->setHeader($headers)->setPostData($postData = array_merge($baseData, [
+					$curl = $this->initCurl()->setUrl($resultUrl)->setHeaders($headers)->setPostData($postData = array_merge($baseData, [
 						'qrLoginToken'     => $qrLoginToken ?? 'UNKNOWN',
 						'qrLoginSignature' => $qrLoginSignature ?? 'UNKNOWN',
 					]))->exec();
@@ -387,11 +389,11 @@ class KuaiCommand extends \owoframe\console\CommandBase
 						$this->getLogger()->success("登录成功! 欢迎你, §6{$_->user->user_name} §w[§3eid:§7{$eid}§w]§5!\n");
 
 						ask('现在请点击授权登录! 完成操作请回车 [ENTER]:', 'OK', true, 'notice');
-						$curl = $this->initCurl()->setUrl($acceptUrl)->setHeader($headers)->setPostData(array_merge($postData, ['sid' => $sid]))->exec();
+						$curl = $this->initCurl()->setUrl($acceptUrl)->setHeaders($headers)->setPostData(array_merge($postData, ['sid' => $sid]))->exec();
 						$_    = $curl->decodeWithJson();
 
 						if(is_object($_) && $verifyResultCode($_->result)) {
-							$curl = $this->initCurl()->setUrl(Url::QR_CODE_CALLBACK)->setHeader($headers)->setPostData(array_merge($baseData, ['sid' => $sid, 'qrToken' => $_->qrToken]))->exec();
+							$curl = $this->initCurl()->setUrl(Url::QR_CODE_CALLBACK)->setHeaders($headers)->setPostData(array_merge($baseData, ['sid' => $sid, 'qrToken' => $_->qrToken]))->exec();
 							$_    = $curl->decodeWithJson(false);
 
 							$web_ph_tag = 'kuaishou.%s.web_ph';
@@ -410,7 +412,7 @@ class KuaiCommand extends \owoframe\console\CommandBase
 							if(is_array($_) && $verifyResultCode($_['result'])) {
 								// 获取 web_ph;
 								if($platform === 'www') {
-									$curl = $this->initCurl()->setUrl(Url::WEB_PH_REQUEST)->setHeader($headers)->returnHeader(true)->setPostData([
+									$curl = $this->initCurl()->setUrl(Url::WEB_PH_REQUEST)->setHeaders($headers)->returnHeader(true)->setPostData([
 										'authToken' => $authToken,
 										'sid' => $sid
 									])->exec();
@@ -419,7 +421,7 @@ class KuaiCommand extends \owoframe\console\CommandBase
 								} else {
 									$operation = self::getOperation();
 									$operation->setPlatform($platform);
-									$object = $this->Graphql($this)->setOperationName($operation->getName('login'))->setQuery($operation->getQuery('login'));
+									$object = $this->Graphql()->setOperationName($operation->getName('login'))->setQuery($operation->getQuery('login'));
 									$object->setVariables(['userLoginInfo' => ['authToken' => $authToken, 'sid' => $sid]]);
 									$object->beforeRequestCallback = function($curl) {
 										$curl->returnHeader(true);
@@ -444,7 +446,7 @@ class KuaiCommand extends \owoframe\console\CommandBase
 								];
 
 								// 获取did;
-								$curl    = $this->initCurl()->setUrl("https://{$platform}.kuaishou.com/profile/{$eid}")->setHeader($headers)->returnHeader(true)->setCookies($commonCookies)->exec();
+								$curl    = $this->initCurl()->setUrl("https://{$platform}.kuaishou.com/profile/{$eid}")->setHeaders($headers)->returnHeader(true)->setCookies($commonCookies)->exec();
 								$cookies = $curl->getCookies();
 								if(empty($cookies)) {
 									$this->getLogger()->error('Cookies获取异常, 请重试.');
@@ -489,7 +491,7 @@ class KuaiCommand extends \owoframe\console\CommandBase
 					return true;
 				}
 				$sid  = $list[$platform];
-				$curl = $this->initCurl()->setUrl(Url::LOGOUT)->setHeader($headers)->setPostData(['sid' => $sid])->returnHeader(true)->setCookiesInRaw(KuaiApp::getCookies($platform))->exec();
+				$curl = $this->initCurl()->setUrl(Url::LOGOUT)->setHeaders($headers)->setPostData(['sid' => $sid])->returnHeader(true)->setCookiesInRaw(KuaiApp::getCookies($platform))->exec();
 				$____ = json_decode($curl->getContent());
 				if($____->result === 1) {
 					KuaiApp::getConfig()->set("cookies.{$platform}", '(cookies: string)');
@@ -572,96 +574,6 @@ class KuaiCommand extends \owoframe\console\CommandBase
 	}
 
 	/**
-	 * 一个简单的Graphql请求处理方法
-	 *
-	 * @author HanskiJay
-	 * @since  2022-07-17
-	 * @return object
-	 */
-	private function Graphql() : object
-	{
-		return new class($this->initCurl())
-		{
-			private $curl;
-
-			/* 原始数据 */
-			public $operationName, $query = '';
-			public $variables = [];
-
-			public $beforeRequestCallback;
-
-			/* 处理结果 */
-			public $headers = '';
-			public $encoded = '';
-			public $result  = null;
-
-			public function __construct(Curl $curl)
-			{
-				$this->curl = $curl;
-			}
-
-			public function setOperationName(string $name) : object
-			{
-				$this->operationName = $name;
-				return $this;
-			}
-
-			public function setVariables(array $variables) : object
-			{
-				$this->variables = array_merge($variables, $this->variables);
-				return $this;
-			}
-
-			public function setQuery(string $query) : object
-			{
-				$this->query = $query;
-				return $this;
-			}
-
-			public function encode() : string
-			{
-				return $this->encoded = json_encode([
-					'operationName' => $this->operationName,
-					'variables'     => $this->variables ?? [],
-					'query'         => $this->query
-				]);
-			}
-
-			public function sendQuery(string $url, string $cookie = '', int $timeout = 60) : object
-			{
-				$this->curl = $this->curl->setUrl($url)->setCookiesInRaw($cookie)->setTimeOut($timeout)->setHeader(['Content-Type: application/json; charset=UTF-8']);
-
-				if(is_callable($this->beforeRequestCallback)) {
-					call_user_func_array($this->beforeRequestCallback, [$this->curl]);
-				}
-
-				$content = $this->curl->setPostDataRaw($this->encode())->exec()->getContent($this->headers);
-
-				if(strlen($content) > 0) {
-					$content = json_decode($content);
-					if(is_object($content)) {
-						$this->result = $content;
-					}
-				}
-				return $this;
-			}
-
-			public function getResult() : ?object
-			{
-				if(isset($this->result->data)) {
-					$this->result = $this->result->data;
-				}
-				return $this->result;
-			}
-
-			public function getCurl() : Curl
-			{
-				return $this->curl;
-			}
-		};
-	}
-
-	/**
 	 * 初始化Curl请求
 	 *
 	 * @param  boolean     $useRadomIp
@@ -677,7 +589,7 @@ class KuaiCommand extends \owoframe\console\CommandBase
 
 		if($useRadomIp) {
 			$radomIp = Curl::getRadomIp();
-			$curl->setHeader([
+			$curl->setHeaders([
 				'CLIENT-IP: ' . $radomIp,
 				'X-FORWARDED-FOR: ' . $radomIp
 			]);
@@ -753,6 +665,11 @@ class KuaiCommand extends \owoframe\console\CommandBase
 				$this->getLogger()->success('保存成功!');
 			}
 		}
+	}
+
+	public function Graphql() : Graphql
+	{
+		return (new Graphql($this->initCurl()));
 	}
 
 	public static function getAliases() : array
