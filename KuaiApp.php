@@ -20,7 +20,7 @@ declare(strict_types=1);
 namespace application\kuai;
 
 use application\kuai\command\KuaiCommand;
-use owoframe\MasterManager;
+use owoframe\console\Console;
 use owoframe\object\JSON;
 
 class KuaiApp extends \owoframe\application\AppBase
@@ -30,7 +30,7 @@ class KuaiApp extends \owoframe\application\AppBase
 		if(!defined('SAVE_PATH')) {
 			define('SAVE_PATH', STORAGE_A_PATH . 'kuaiApp' . DIRECTORY_SEPARATOR); // 默认将解析到的作品资源保存在框架的资源存储文件目录下;
 		}
-		MasterManager::getInstance()->getUnit('console')->registerCommand(KuaiCommand::getName(), KuaiCommand::class);
+		Console::getInstance()->registerCommand(new KuaiCommand);
 	}
 
 	public static function isCLIOnly() : bool

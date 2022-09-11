@@ -18,11 +18,13 @@
 declare(strict_types=1);
 namespace application\kuai\command;
 
+use owoframe\System;
 use application\kuai\KuaiApp;
 use application\kuai\api\{Graphql, Url};
-use owoframe\helper\Helper;
 use owoframe\exception\OwOFrameException;
-use owoframe\utils\Curl;
+use owoframe\network\Curl;
+use owoframe\network\Network;
+use owoframe\utils\Str;
 
 class KuaiCommand extends \owoframe\console\CommandBase
 {
@@ -197,7 +199,7 @@ class KuaiCommand extends \owoframe\console\CommandBase
 			}
 		}
 		if($autoDownload) {
-			if(Helper::getOS() === 'windows') {
+			if(System::getOS() === 'windows') {
 				system('start ' . $authorPath);
 				$this->getLogger()->success('已打开保存文件夹.');
 			}
@@ -357,7 +359,7 @@ class KuaiCommand extends \owoframe\console\CommandBase
 					if(is_file($path)) unlink($path);
 					file_put_contents($path, base64_decode($imageData));
 
-					if(Helper::getOS() === 'windows') {
+					if(System::getOS() === 'windows') {
 						system('start ' . $path);
 					} else {
 						$this->getLogger()->info("二维码已保存在路径 '{$path}' 中, 请手动打开此文件.");
@@ -588,7 +590,7 @@ class KuaiCommand extends \owoframe\console\CommandBase
 		$curl = (new Curl())->returnBody($returnBody)->returnHeader($returnHeader)->userAgentInPC();
 
 		if($useRadomIp) {
-			$radomIp = Curl::getRadomIp();
+			$radomIp = Network::getRadomIp();
 			$curl->setHeaders([
 				'CLIENT-IP: ' . $radomIp,
 				'X-FORWARDED-FOR: ' . $radomIp
@@ -630,7 +632,7 @@ class KuaiCommand extends \owoframe\console\CommandBase
 			$status = '无法通过URL设置文件名!';
 		}
 
-		if(!Helper::isDomain($pu['host'])) {
+		if(!Str::isDomain($pu['host'])) {
 			$status = '无效的网址!';
 			return false;
 		}

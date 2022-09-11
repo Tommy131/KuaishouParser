@@ -18,7 +18,7 @@
 declare(strict_types=1);
 namespace application\kuai\api;
 
-use owoframe\utils\Curl;
+use owoframe\network\Curl;
 
 class Graphql
 {
