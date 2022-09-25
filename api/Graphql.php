@@ -18,6 +18,7 @@
 declare(strict_types=1);
 namespace application\kuai\api;
 
+use application\kuai\KuaiApp;
 use owoframe\network\Curl;
 
 class Graphql
@@ -35,15 +36,93 @@ class Graphql
      */
     public $beforeRequestCallback;
 
+    /**
+     * 上次调用名称
+     *
+     * @var string
+     */
+    public $lastCallName;
+
     /* 处理结果 */
     public $headers = '';
     public $encoded = '';
     public $result  = null;
 
-    public function __construct(Curl $curl)
-    {
-        $this->curl = $curl;
-    }
+    /**
+	 * Graphql操作类
+	 *
+	 * @author HanskiJay
+	 * @since  2022-07-24
+	 * @return object
+	 */
+	public function getOperation() : object
+	{
+		return new class {
+			private $platform = 'www';
+			private $names = [
+				'principalData' => [
+					'www'  => 'visionProfile',
+					'live' => 'sensitiveUserInfoQuery'
+				],
+				'feedData' => [
+					'www'  => 'visionVideoDetail',
+					'live' => 'publicFeedsQuery'
+				],
+				'searchEID' => [
+					'www'  => 'graphqlSearchUser',
+                    'live' => 'SharePageQuery'
+				],
+				'login' => [
+					'www'  => 'userInfoQuery',
+					'live' => 'UserLogin'
+				]
+			];
+
+			public function getName(string $type) : ?string
+			{
+				return $this->lastCallName = $this->names[$type][$this->platform] ?? null;
+			}
+
+			public function getQuery(string $type) : ?string
+			{
+				$appPath = KuaiApp::getAppPath() . 'graphql' . DIRECTORY_SEPARATOR;
+				$query = [
+					'principalData' => [
+						'www'  => 'visionProfile.graphql',
+						'live' => 'sensitiveUserInfoQuery.graphql'
+					],
+					'feedData' => [
+						'www'  => 'visionVideoDetail.graphql',
+						'live' => 'publicFeedsQuery.graphql'
+					],
+					'searchEID' => [
+						'www' => 'graphqlSearchUser.graphql',
+                        'live' => 'SharePageQuery.graphql'
+					],
+					'login' => [
+						'www'  => 'UserLoginServer.graphql',
+						'live' => 'UserLoginLive.graphql'
+					]
+				];
+				$query = $query[$type][$this->platform] ?? null;
+				if(!is_null($query) && is_file($file = $appPath . $query)) {
+					$query = file_get_contents($file);
+				}
+				return $query;
+			}
+
+			public function setPlatform(string $platform = 'www') : object
+			{
+				$this->platform = $platform;
+                return $this;
+			}
+
+            public function getLastCall() : ?string
+            {
+                return $this->lastCallName;
+            }
+		};
+	}
 
     /**
      * 设置操作名称
@@ -117,13 +196,13 @@ class Graphql
      */
     public function sendQuery(string $url, string $cookie = '', int $timeout = 60) : Graphql
     {
-        $this->curl->setUrl($url)->setCookiesInRaw($cookie)->setTimeOut($timeout)->setContentType('application/json; charset=UTF-8');
+        $this->getCurl()->setUrl($url)->setCookiesInRaw($cookie)->setTimeOut($timeout)->setContentType('application/json; charset=UTF-8');
 
         if(is_callable($this->beforeRequestCallback)) {
-            call_user_func_array($this->beforeRequestCallback, [$this->curl]);
+            call_user_func_array($this->beforeRequestCallback, [$this->getCurl()]);
         }
 
-        $content = $this->curl->setPostDataRaw($this->encode())->exec()->getContent($this->headers);
+        $content = $this->getCurl()->setPostDataRaw($this->encode())->exec()->getContent($this->headers);
 
         if(strlen($content) > 0) {
             $content = json_decode($content);
@@ -139,9 +218,9 @@ class Graphql
      *
 	 * @author HanskiJay
 	 * @since  2022-07-17
-     * @return Graphql|null
+     * @return mixed
      */
-    public function getResult() : ?Graphql
+    public function getResult()
     {
         if(isset($this->result->data)) {
             $this->result = $this->result->data;
@@ -152,12 +231,16 @@ class Graphql
     /**
      * 获取Curl对象
      *
+     * @param  boolean  $reset
 	 * @author HanskiJay
 	 * @since  2022-07-17
      * @return Curl
      */
-    public function getCurl() : Curl
+    public function getCurl(bool $reset = false) : Curl
     {
+        if($reset || (!$this->curl instanceof Curl)) {
+            $this->curl = KuaiApp::initCurl();
+        }
         return $this->curl;
     }
 }
