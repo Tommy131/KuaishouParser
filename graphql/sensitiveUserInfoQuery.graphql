@@ -1,5 +1,5 @@
-query sensitiveUserInfoQuery($userId: String) {
-  sensitiveUserInfo(principalId: $userId) {
+query sensitiveUserInfoQuery($principalId: String) {
+  sensitiveUserInfo(principalId: $principalId) {
     kwaiId
     originUserId
     constellation

@@ -1,8 +1,7 @@
-query privateFeedsQuery($userId: String, $count: Int) {
-  privateFeeds(principalId: $userId, count: $count) {
+query privateFeedsQuery($principalId: String, $count: Int) {
+  privateFeeds(principalId: $principalId, count: $count) {
     list {
       id
-      poster
       workType
       imgUrls
       musicName

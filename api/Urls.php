@@ -18,7 +18,7 @@
 declare(strict_types=1);
 namespace application\kuai\api;
 
-interface Url
+interface Urls
 {
 	/**
 	 * ~站点 'live.kuaishou.com' 的数据接口
@@ -39,7 +39,7 @@ interface Url
 	 *
 	 * @var string
 	 */
-	public const ARTICLE_DATA = 'https://v.m.chenzhongtech.com/rest/wd/photo/info';
+	public const RESOURCE_DATA = 'https://v.m.chenzhongtech.com/rest/wd/photo/info';
 
 	/**
 	 * ~二维码登录接口基本地址

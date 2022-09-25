@@ -1,17 +1,10 @@
-query visionVideoDetail($photoId: String){
-  visionVideoDetail(photoId: $photoId){
-    author {
-      id
-      name
-    }
+query visionVideoDetail($videoId: String) {
+  visionVideoDetail(photoId: $videoId) {
     photo {
-      id
-      caption
       likeCount
       realLikeCount
       coverUrl
       photoUrl
-      timestamp
       viewCount
     }
     tags {
