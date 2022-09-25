@@ -4,6 +4,7 @@
 
 此项目采用 `OwOFrame` 进行的后端构建, 需要配套使用. 项目地址: [点我](https://github.com/Tommy131/OwOFrame)<br/>
 本项目仅用于学习交流等途径, 严禁贩卖此源码! 个人/组织闭源申请请提交 `Issue` 以进行申请!<br/>
+请务必采用默认提供的Issue模板提交BUG或建议!<br/>
 
 ## 实现目标
 
@@ -36,13 +37,14 @@
 
 ##### 指令2: 分享解析 `php owo kuai shareId [id: string] (--autoDownload) (--mode_pc)`<br/>
 - 此处的 `id` 为 `https://v.kuaishou.com/sharId` 中的 `shareId`
+- `shareId`: 目前有三种写法, 其另外两种可为 `-s`, `-shareId`
 - `--autoDownload`: 自动下载获取到的作品
 - `--mode_pc`: 从Web网页端中解析 (默认解析平台为手机客户端)
 
-##### 指令3: 模拟登录 `php owo kuai --login (platform: string)`<br/>
+##### 指令3: 模拟登录 `php owo kuai -login (platform: string)`<br/>
 - 此处的 `platform` 为登录的站点/平台 (默认 `www.kuaishou.com` 及 `www`, `live.kuaishou.com` 为 `live`)
 - 根据提示进行操作! 如下图:
-![登录操作](static/img/tested_web_login.png)
+![登录操作](.repo/img/tested_web_login.png)
 
 ## 特性
 - [x] 支持模拟扫码登录主动获取 `Cookies`
@@ -57,7 +59,7 @@
 
 ### 截图展示 (后端指令实现)
 CLI数据抓取<br/>
-![CLI数据抓取](static/img/cli-command.png)
+![CLI数据抓取](.repo/img/cli-command.png)
 
 <br/>
 
