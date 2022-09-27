@@ -60,7 +60,7 @@ class KuaiCommand extends \owoframe\console\CommandBase
 
 		// ~需要查询的用户ID;
 		$userId = array_shift($params);
-		if(!preg_match('/[0-9a-z_]+/i', $userId)) {
+		if(!$userId || !preg_match('/[0-9a-z_]+/i', $userId)) {
 			$this->getLogger()->error('无效的用户ID! 请检查是否正确输入.');
 			return false;
 		}
@@ -76,7 +76,7 @@ class KuaiCommand extends \owoframe\console\CommandBase
             $this->getLogger()->error('[0x001] 请求失败, 请稍后重试.');
             return true;
 		}
-		$result = is_array($result->users) ? array_shift($result->users) : [];
+		$result = is_array($result) ? array_shift($result) : [];
         $result = !empty($result) ? $result->user_id : null;
         if(is_string($result)) {
             $userId = $result;
@@ -88,14 +88,22 @@ class KuaiCommand extends \owoframe\console\CommandBase
             return true;
         }
 		extract($result);
-		$_gender = $getGender($gender);
+		$feedCount = (int) $feedCount;
+		$_gender   = $getGender($gender);
+
+		$this->getLogger()->sendEmpty();
         $this->getLogger()->info("--------------------[UserId:§3{$userId}§w]--------------------");
         $this->getLogger()->info($_gender . "所在的城市: §b§l{$cityName}§r§w | 性别: §{$getGender($gender, 1)}§r§w | 星座: §7{$constellation}");
         $this->getLogger()->info("快手号: §3{$kwaiId}§r§w | 原始ID: §3{$originUserId}§r§w | 显示名称: §b§3{$displayName}§r§w | 粉丝数: §7{$fansCount}§r§w | 作品数量: §7{$feedCount}§r§w | 私有作品: §7{$privateCount}");
         $this->getLogger()->info($_gender . '的个人简介: §r§i' . str_replace("\n", '  ', $description));
         $this->getLogger()->info('----------------------------------------------------------------');
 
-		$result = Feeds::getPureDataSet($userId, (int) $feedCount);
+		if($feedCount <= 0) {
+			$this->getLogger()->info('§6这个家伙没有任何的作品, 到此为止啦, 再查下去就不礼貌了~');
+			return true;
+		}
+
+		$result = Feeds::getPureDataSet($userId, $feedCount);
 		if(!$result) {
             $this->getLogger()->error('[0x003] 请求失败, 请稍后重试.');
             return true;
@@ -103,7 +111,7 @@ class KuaiCommand extends \owoframe\console\CommandBase
 		extract($result);
 
 		$this->getLogger()->sendEmpty();
-        $this->getLogger()->info($_gender . '在快手一共发布了 §b§1' . count($result) . '§r§w 个作品!');
+        $this->getLogger()->info('成功获取了' . $_gender . '在快手发布的 §b§1' . count($result) . '§r§w 个作品!');
         $this->getLogger()->sendEmpty();
 
         $authorPath = $savePath . $userId . DIRECTORY_SEPARATOR;
@@ -113,19 +121,19 @@ class KuaiCommand extends \owoframe\console\CommandBase
             if($feed->timestamp === null) continue;
 
             $location      = $feed->location ?? 'N/A';
-            $coordinate    = ($location !== 'N/A') ? "{$location->longitude}° {$location->latitude}°" : '';
+            $coordinate    = ($location !== 'N/A') ? "{$location->longitude}° {$location->latitude}°" : '§g无';
             $address       = $feed->location->address ?? 'N/A';
             $city          = $feed->location->city ?? 'N/A';
-            $location      = ($location !== 'N/A') ? "§2{$address} §w(在 §2{$city}§w 标注了 §4{$feed->location->title}§w)" : '无';
+            $location      = ($location !== 'N/A') ? "§2{$address} §w(在 §2{$city}§w 标注了 §4{$feed->location->title}§w)" : '§g无';
             $uploadTime    = date('Y-m-d H:i:s', (int) ($feed->timestamp / 1000));
             $allowComments = $feed->onlyFollowerCanComment ? '§1仅允许关注者评论' : '§5允许';
 
 
             $this->getLogger()->info('----------------------------------------------------------------');
-            $this->getLogger()->info("[No.{$k}] 上传时间: §2{$uploadTime}§r§w | 定位: {$location}§r§w | 经纬度: §g{$coordinate}");
+            $this->getLogger()->info("[No.{$k}] 上传时间: §3{$uploadTime}§r§w | 定位: {$location}§r§w | 经纬度: {$coordinate}");
             $this->getLogger()->info("作品ID: §3{$feed->id}§r§w | 类型: §3{$feed->workType}§r§w | 公开评论: {$allowComments}§r§w | 评论数: §7{$feed->counts->displayComment}");
             $this->getLogger()->info("获赞数: §7{$feed->counts->displayLike}§r§w | 共计观看次数: §7{$feed->counts->displayView}");
-            $this->getLogger()->info('文章标题及标签: §g' . str_replace("\n", '  ', $feed->caption));
+            $this->getLogger()->info('文章标题及标签: §5§i§b' . str_replace("\n", '  ', $feed->caption));
 
             if(in_array($feed->workType, ['single', 'vertical', 'multiple'])) {
                 $imgUrls = $feed->imgUrls;
@@ -146,7 +154,7 @@ class KuaiCommand extends \owoframe\console\CommandBase
 					if($videoUrl) {
                     	$this->download($videoUrl, $authorPath, $feed->id);
 					} else {
-						$this->getLogger()->alert('无法获取该作品的视频资源地址.');
+						$this->getLogger()->error('无法获取该作品的视频资源地址.');
 					}
                 }
             }
@@ -172,25 +180,31 @@ class KuaiCommand extends \owoframe\console\CommandBase
 	 */
 	private function interceptParameters(array $params, bool $autoDownload = false) : bool
 	{
+		$isExecuted = true;
 		switch(array_shift($params)) {
 			case '-s':
 			case '-shareId':
 			case 'shareId':
 				$shareId = array_shift($params) ?? null;
                 if(is_null($shareId)) {
-                    $this->getLogger()->error('无效的分享ID! 请检查是否正确输入.');
+                    $this->getLogger()->error('[0x011] 无效的分享ID! 请检查是否正确输入.');
+					return true;
                 } else {
-                    $this->getLogger()->info("正在解析分享作品Id §3{$shareId} §w......");
+                    $this->getLogger()->info("正在解析分享作品ID: §3{$shareId} §w......");
 				}
 
 				$dataInfo = Feeds::queryShareId($shareId, isset($params[array_search('--mode_pc', $params)]));
+				if(!$dataInfo) {
+					$this->getLogger()->error('[0x012] 无法解析该分享ID.');
+					return true;
+				}
 				extract($dataInfo);
 				$this->getLogger()->info("获取到的的作品信息如下 (Type=§3{$type}§w):");
                 $this->getLogger()->info('----------------------------------------------------------------');
                 $this->getLogger()->info("作者ID: §3{$userId}§r§w | 原始ID: §3{$originalId}§r§w | 快手号: §3{$kwaiId}§r§w | 显示名称: §3{$userName}");
                 $this->getLogger()->info("粉丝数: §3{$fansCount}§r§w | 关注数: §3{$followCount}§r§w | 已发布的作品: §3{$photoCount}");
                 $this->getLogger()->info("作品ID: §3{$photoId}§r§w | 获赞数: §7{$likeCount}§r§w | 共计观看次数: §7{$viewCount}§r§w | 评论数: §7{$commentCount}§r§w | 分享数: §7{$shareCount}");
-                $this->getLogger()->info('文章标题及标签: §5' . str_replace("\n", '  ', $caption));
+                $this->getLogger()->info('文章标题及标签: §5§i§b' . str_replace("\n", '  ', $caption));
                 $this->getLogger()->info('----------------------------------------------------------------');
 
                 if($autoDownload) {
@@ -213,17 +227,19 @@ class KuaiCommand extends \owoframe\console\CommandBase
 				if(!User::login(array_shift($params) ?? 'www', $errorMessage)) {
 					$this->getLogger()->error($errorMessage);
 				}
-				return true;
 			break;
 
 			case '-o':
 			case '-lo':
 			case '-logout':
 				$this->getLogger()->info(User::logout(array_shift($params) ?? 'www') ? '账号退出成功.' : '未知错误.');
-				return true;
+			break;
+
+			default:
+				$isExecuted = false;
 			break;
 		}
-		return false;
+		return $isExecuted;
 	}
 
 	/**
@@ -292,7 +308,8 @@ class KuaiCommand extends \owoframe\console\CommandBase
 			$status = '文件已存在, 跳过下载.';
 			return true;
 		}
-		@file_put_contents($outputPath . $saveName, file_get_contents($url));
+		$_ = $this->initCurl()->setUrl($url)->exec()->getContent();
+		file_put_contents($outputPath . $saveName, $_);
 		return is_file($outputPath . $saveName);
 	}
 

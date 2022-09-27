@@ -57,15 +57,16 @@ class User
      * 根据用户名模糊查找用户
      *
      * @param  string     $name
-     * @return object|null
+     * @return array|null
      */
-    public static function search(string $name) : ?object
+    public static function search(string $name) : ?array
     {
         $graphql   = new Graphql;
         $operation = $graphql->getOperation();
         $graphql->setOperationName($operation->getName('searchEID'))->setVariables(['keyword' => $name])->setQuery($operation->getQuery('searchEID'));
         $result    = $graphql->sendQuery(Urls::GRAPHQL_WWW, Kuai::getCookies('www'))->getResult();
-        return $result->visionSearchUser ?? null;
+        $result    = $result->visionSearchUser ?? null;
+        return ($result && !empty($result->users)) ? $result->users : null;
     }
 
     /**
@@ -80,16 +81,17 @@ class User
         $operation = $graphql->getOperation();
         $graphql->setOperationName($operation->getName('principalData'))->setVariables(['userId' => $userId])->setQuery($operation->getQuery('principalData'));
         $result = $graphql->sendQuery(Urls::GRAPHQL_WWW, Kuai::getCookies('www'))->getResult();
-        $result = $result->visionProfile->userProfile ?? null;
+        $result = $result->visionProfile->userProfile->profile ?? null;
 
         if(is_null($result)) {
             return null;
         }
         $_ = [];
 
-        $_['gender']      = $result->profile->gender;
-        $_['displayName'] = $result->profile->user_name;
-        $_['description'] = $result->profile->user_text;
+        $_['gender']      = $result->gender;
+        $_['displayName'] = $result->user_name;
+        $_['description'] = $result->user_text;
+        $_['description'] = !$_['description'] ? 'N/A' : $_['description'];
 
         $operation->setPlatform('live');
         $graphql->setOperationName($operation->getName('principalData'))->setVariables(['principalId' => $userId])->setQuery($operation->getQuery('principalData'));
@@ -100,14 +102,15 @@ class User
             return null;
         }
 
-        $_['kwaiId']        = $result->kwaiId ?? '未定义';
+        $_['kwaiId']        = $result->kwaiId ?? 'N/A';
         $_['originUserId']  = $result->originUserId;
         $_['constellation'] = $result->constellation;
-        $_['cityName']      = $result->cityName;
+        $_['constellation'] = !$_['constellation'] ? 'N/A' : $_['constellation'];
+        $_['cityName']      = $result->cityName ?? 'N/A';
 
         $_['fansCount']     = $result->counts->fan;
         $_['feedCount']     = $result->counts->photo;
-        $_['privateCount']  = $result->counts->private ?? 0;
+        $_['privateCount']  = $result->counts->private ?? 'N/A';
 
         return $_;
     }
@@ -197,16 +200,14 @@ class User
         }
 
         $curl = Kuai::initCurl()->setUrl(Urls::QR_CODE_CALLBACK)->setHeaders($headers)->setPostData(array_merge($baseData, ['sid' => $sid, 'qrToken' => $_->qrToken]))->exec();
-        $_    = $curl->decodeWithJson(false);
 
-        $web_ph_tag = 'kuaishou.%s.web_ph';
-        $web_ph_tag = sprintf($web_ph_tag, ($platform === 'www') ? 'server' : 'live');
+        $_ = 'kuaishou.%s.';
+        $_ = sprintf($_, ($platform === 'www') ? 'server' : 'live');
+        $web_ph_tag = $_ .'web_ph';
+        $web_st_tag = $_ .'web_st';
+        $web_at_tag = $_ .'web.at';
 
-        $web_st_tag = 'kuaishou.%s.web_st';
-        $web_st_tag = sprintf($web_st_tag, ($platform === 'www') ? 'server' : 'live');
-
-        $web_at_tag = 'kuaishou.%s.web.at';
-        $web_at_tag = sprintf($web_at_tag, ($platform === 'www') ? 'server' : 'live');
+        $_ = $curl->decodeWithJson(false);
 
         $userId     = $_['userId'];
         $web_st     = $_[$web_st_tag];
