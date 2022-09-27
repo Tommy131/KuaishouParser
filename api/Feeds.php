@@ -87,6 +87,7 @@ class Feeds
         }
 
         Kuai::initCurl()->returnHeader(true)->setUrl($url . $shareId)->exec()->getContent($h);
+        if(!$h) return null;
         if(!preg_match('/^Location: (.*)$/imU', $h, $match)) {
             return null;
         }
@@ -95,17 +96,37 @@ class Feeds
         if(is_null($photoId)) {
             return null;
         }
-
         $photoId = @end(explode('/', $result['path']));
 
+        parse_str($result['query'] ?? '', $result);
+        if(!is_array($result) || empty($result)) {
+            return null;
+        }
+        $prepared = [
+            'fid'               => '',
+            'shareToken'        => '',
+            'shareObjectId'     => '',
+            'shareMethod'       => '',
+            'shareId'           => '',
+            'shareResourceType' => '',
+            'shareChannel'      => 'share_copylink',
+            'kpn'               => '',
+            'subBiz'            => '',
+            'env'               => 'SHARE_VIEWER_ENV_TX_TRICK',
+            'h5Domain'          => 'v.m.chenzhongtech.com',
+            'photoId'           => '',
+            'isLongVideo'       => ''
+        ];
+        $prepared = array_merge($prepared, array_intersect_key($result, $prepared));
+
         $curl = Kuai::initCurl()
+            ->userAgentInMobile()
             ->setUrl(Urls::RESOURCE_DATA)
-            ->setPostData(['photoId' => $photoId], true)
+            ->setPostData($prepared, true)
             ->setCookiesInRaw('did=web_')
             ->setContentType('application/json; charset=UTF-8')
             ->setReferer($match[1])
         ->exec();
-
         $json = $curl->decodeWithJson(true);
         if($json->result !== 1) {
             return null;

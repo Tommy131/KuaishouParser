@@ -160,7 +160,7 @@ class KuaiCommand extends \owoframe\console\CommandBase
             }
         }
         if($autoDownload) {
-            if(System::getOS() === 'windows') {
+            if((System::getOS() === 'windows') && is_dir($authorPath)) {
                 system('start ' . $authorPath);
                 $this->getLogger()->success('已打开保存文件夹.');
             }
