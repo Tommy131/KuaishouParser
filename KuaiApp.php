@@ -35,9 +35,9 @@ class KuaiApp extends \owoframe\application\AppBase
         Console::getInstance()->registerCommand(new KuaiCommand);
     }
 
-    public static function isCLIOnly() : bool
+    public static function enableLoadMode(): array
     {
-        return true;
+        return [1];
     }
 
     public static function autoTo404Page() : bool
