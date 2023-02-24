@@ -132,7 +132,7 @@ class KuaiCommand extends CommandBase
             case '-search':
 		        $userId = array_shift($params);
                 $page   = array_shift($params) ?? 1;
-                if(!$userId || !preg_match('/[0-9a-z_]+/i', $userId)) {
+                if(!is_string($userId)) {
                     $this->getLogger()->error(Kuai::LOG_PREFIX . '无效的用户ID! 请检查是否正确输入.');
                     return true;
                 }

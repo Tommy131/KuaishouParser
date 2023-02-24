@@ -11,7 +11,7 @@
  * @Author       : HanskiJay
  * @Date         : 2023-02-22 02:55:56
  * @LastEditors  : HanskiJay
- * @LastEditTime : 2023-02-24 21:53:38
+ * @LastEditTime : 2023-02-24 23:24:54
  * @E-Mail       : support@owoblog.com
  * @Telegram     : https://t.me/HanskiJay
  * @GitHub       : https://github.com/Tommy131
@@ -84,6 +84,16 @@ class UserQuery
     }
 
     /**
+     * 将用户ID编码 (防止中文乱码)
+     *
+     * @return string
+     */
+    public function encodePrincipalId() : string
+    {
+        return urlencode($this->principalId);
+    }
+
+    /**
      * Curl请求实例
      *
      * @param  string $url
@@ -91,7 +101,7 @@ class UserQuery
      */
     protected function request(string $url) : Curl
     {
-        return $this->curl()->setUrl($url)->setCookieRaw($this->module->cookie(API::TAG_LIVE))->setContentType('application/json, text/plain, */*');
+        return $this->curl()->setUrl($url)->setCookieRaw($this->module->cookie(API::TAG_LIVE));
     }
 
     /**
@@ -119,7 +129,7 @@ class UserQuery
      */
     public function search(int $page = 1) : ?array
     {
-        $data = $this->query(API::LIVE_SEARCH . "{$this->principalId}&page={$page}");
+        $data = $this->query(API::LIVE_SEARCH . "{$this->encodePrincipalId()}&page={$page}");
         $data = self::verifyResult($data) ? ($data->list ?? null) : null;
         return $data;
     }
@@ -131,7 +141,7 @@ class UserQuery
      */
     public function searchById() : ?object
     {
-        $data = $this->query(API::LIVE_USER_INFO . $this->principalId);
+        $data = $this->query(API::LIVE_USER_INFO . $this->encodePrincipalId());
         $data = self::verifyResult($data) ? ($data->userInfo ?? null) : null;
         return $data;
     }
@@ -143,7 +153,7 @@ class UserQuery
      */
     public function sensitiveInfo() : ?object
     {
-        $data = $this->query(API::LIVE_SENSITIVE_INFO . $this->principalId);
+        $data = $this->query(API::LIVE_SENSITIVE_INFO . $this->encodePrincipalId());
         $data = self::verifyResult($data) ? ($data->sensitiveUserInfo ?? null) : null;
         return $data;
     }
@@ -157,7 +167,7 @@ class UserQuery
      */
     public function getFeeds(string $pcursor = '', int $count = 1200) : ?array
     {
-        $data = $this->query(API::LIVE_GET_FEEDS . "{$this->principalId}&pcursor={$pcursor}&count={$count}");
+        $data = $this->query(API::LIVE_GET_FEEDS . "{$this->encodePrincipalId()}&pcursor={$pcursor}&count={$count}");
         $data = self::verifyResult($data) ? ($data->list ?? null) : null;
         return $data;
     }
@@ -170,7 +180,7 @@ class UserQuery
      */
     public function feedInfo(string $photoId) : ?object
     {
-        $data = $this->query(API::LIVE_FEED_INFO . "{$this->principalId}&photoId={$photoId}");
+        $data = $this->query(API::LIVE_FEED_INFO . "{$this->encodePrincipalId()}&photoId={$photoId}");
         $data = self::verifyResult($data) ? ($data->currentWork ?? null) : null;
         return $data;
     }
@@ -354,6 +364,9 @@ class UserQuery
      */
     public function download() : bool
     {
+        if(!is_file($this->getCacheFile())) {
+            return false;
+        }
         $this->setFileName($this->principalId, 'FeedsData');
         $data = $this->getCache(true);
         $list = ($data->length() > 0) ? $data->get('list') : $this->getFeeds();
