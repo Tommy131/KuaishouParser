@@ -1,0 +1,14 @@
+{
+    "namespace":   "kuai",
+    "class":       "module\\kuai\\KuaishouParser",
+    "displayName": "KuaishouParser",
+    "author":      "HanskiJay",
+    "version":     "1.0.0",
+    "description": "快手作品解析工具",
+    "priority":    3,
+    "skipLoad":    false,
+    "allowedIn":   ["cli"],
+    "compatible":  [
+        "1.0.5-dev"
+    ]
+}
