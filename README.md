@@ -29,11 +29,9 @@
 ### 0. 安装说明
 
 - 先克隆项目[OwOFrame](https://github.com/Tommy131/OwOFrame)到一个文件目录下.
-- 安装好框架 `OwOFrame` 之后, 将此项目克隆到 `application` 目录内.
-- 重命名 `KuaishouParser` 为 `kuai`.
+- 安装好框架 `OwOFrame` 之后, 将此项目克隆到 `storage/module` 目录内.
 
-> 注意: 你也可以直接使用指令 `git clone https://github.com/Tommy131/KuaishouParser.git kuai` 到 `application` 目录下.
-> 确保最终项目名称为 `kuai` 即可.
+> 注意: 你也可以直接使用指令 `git clone https://github.com/Tommy131/KuaishouParser.git` 到 `storage/module` 目录下.
 
 ### 1. Cookies的获取方法
 
@@ -73,21 +71,33 @@
 
 - `authorId`: 作者ID (此处的ID可以为快手App中显示的快手号, 也可以为 <https://(快手的域名)/profile/authorId> 中的 authorId)
 
-#### 4.2. 分享解析
+#### 4.2. 模糊用户搜索
 
-指令为: `owo kuai -s [id: string] (--mode-mobile)`
+指令为:  `owo kuai -search [userName: string]`  
+
+- `authorId`: 用户名称
+
+#### 4.3. 分享解析
+
+指令为: `owo kuai -sid [id: string] (--mode-mobile)`
 
 - 此处的 `id` 为 <https://v.kuaishou.com/xxxxxx> 中的 xxxxxx
 - PC端为 <https://www.kuaishou.com/f/xxxxxx> 中的 xxxxxx
-- `-s`: 目前有三种写法, 其另外两种可为, "-shareId", "-sid"
+- `-sid`: 分享ID, 也可以写作 "-shareId"
 - `--mode-pc`: 从Web网页端中解析
 - `--mode-mobile`: 从手机客户端中解析 (默认解析平台为手机客户端)
 
-#### 4.3. 模拟登录 (扫码登录)
+#### 4.4. 缓存删除
 
-指令为: `owo kuai -login (platform: string)`
+指令为: `owo kuai -d [fileName: string] [...string]`
 
-- 此处的 `platform` 为登录的站点/平台 (默认 `www`, 另外的选项为 `live`)
+- 此处的 `fileName` 为 `downloaded` 目录下的任意文件/文件夹名称
+
+#### 4.5. 模拟登录 (扫码登录)
+
+指令为: `owo kuai login (platform: string)`
+
+- 此处的 `platform` 为登录的站点/平台 (默认 `live`, 另外的选项为 `www`)
 - 根据提示进行操作! 如下图:
 ![登录操作](.repo/img/tested_web_login.png)
 

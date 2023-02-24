@@ -27,11 +27,9 @@ Please follow the steps below slowly.
 ### 0. Installation
 
 - First clone the project [OwOFrame](https://github.com/Tommy131/OwOFrame) to a file directory.
-- After installing the framework `OwOFrame`, clone this project into the `application` directory.
-- Renamed `KuaishouParser` to `kuai`.
+- After installing the framework `OwOFrame`, clone this project into the `storage/module` directory.
 
-> Attention: You can also use the command `git clone https://github.com/Tommy131/KuaishouParser.git kuai` directly to the `application` directory.
-> Make sure the final project name is `kuai`.
+> Attention: You can also use the command `git clone https://github.com/Tommy131/KuaishouParser.git` directly to the `storage/module` directory.
 
 ### 1. How to get cookies?
 
@@ -71,17 +69,29 @@ The command is: `owo kuai [authorId: string]`
 
 - `authorId`: Author ID (the ID here can be the Kuaishou account displayed in the Kuaishou App, or the authorId in <https://(Kuishou>'s domain name)/profile/authorId)
 
-#### 4.2. Share Analysis
+#### 4.2. User Search
+
+The command is: `owo kuai -search [userName: string]`  
+
+- `userName`: The name you want to search
+
+#### 4.3. Share Analysis
 
 The command is: `owo kuai -s [id: string] (--mode-mobile)`
 
 - here's `id` is xxxxxx in <https://v.kuaishou.com/xxxxxx>
 - on PC's `id` is xxxxxx in <https://www.kuaishou.com/f/xxxxxx>
-- `-s`: There are currently three ways of writing, the other two can be "-shareId", "-sid"
+- `-sid`: share Id, another way is "-shareId"
 - `--mode-pc`: Parse from web page
 - `--mode-mobile`: Parse from KuaiShou Mobile Client (default parsing platform is mobile client)
 
-#### 4.3. Simulate login (QR-Code)
+#### 4.4. Delete Cache
+
+Th command is: `owo kuai -d [fileName: string] [...string]`
+
+- `fileName`: the name in path `downloaded` (could be a dir or a file)
+
+#### 4.5. Simulate login (QR-Code)
 
 The command is: `owo kuai -login (platform: string)`
 
