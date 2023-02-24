@@ -11,7 +11,7 @@
  * @Author       : HanskiJay
  * @Date         : 2023-02-22 02:55:56
  * @LastEditors  : HanskiJay
- * @LastEditTime : 2023-02-24 04:08:36
+ * @LastEditTime : 2023-02-24 21:53:38
  * @E-Mail       : support@owoblog.com
  * @Telegram     : https://t.me/HanskiJay
  * @GitHub       : https://github.com/Tommy131
@@ -91,7 +91,7 @@ class UserQuery
      */
     protected function request(string $url) : Curl
     {
-        return $this->curl()->setUrl($url)->setCookieRaw($this->module->cookie(API::TAG_LIVE));
+        return $this->curl()->setUrl($url)->setCookieRaw($this->module->cookie(API::TAG_LIVE))->setContentType('application/json, text/plain, */*');
     }
 
     /**
@@ -120,7 +120,7 @@ class UserQuery
     public function search(int $page = 1) : ?array
     {
         $data = $this->query(API::LIVE_SEARCH . "{$this->principalId}&page={$page}");
-        $data = (isset($data->result) && ($data->result === 1)) ? ($data->list ?? null) : null;
+        $data = self::verifyResult($data) ? ($data->list ?? null) : null;
         return $data;
     }
 
@@ -132,7 +132,7 @@ class UserQuery
     public function searchById() : ?object
     {
         $data = $this->query(API::LIVE_USER_INFO . $this->principalId);
-        $data = (isset($data->result) && ($data->result === 1)) ? ($data->userInfo ?? null) : null;
+        $data = self::verifyResult($data) ? ($data->userInfo ?? null) : null;
         return $data;
     }
 
@@ -144,7 +144,7 @@ class UserQuery
     public function sensitiveInfo() : ?object
     {
         $data = $this->query(API::LIVE_SENSITIVE_INFO . $this->principalId);
-        $data = (isset($data->result) && ($data->result === 1)) ? ($data->sensitiveUserInfo ?? null) : null;
+        $data = self::verifyResult($data) ? ($data->sensitiveUserInfo ?? null) : null;
         return $data;
     }
 
@@ -158,7 +158,7 @@ class UserQuery
     public function getFeeds(string $pcursor = '', int $count = 1200) : ?array
     {
         $data = $this->query(API::LIVE_GET_FEEDS . "{$this->principalId}&pcursor={$pcursor}&count={$count}");
-        $data = (isset($data->result) && ($data->result === 1)) ? ($data->list ?? null) : null;
+        $data = self::verifyResult($data) ? ($data->list ?? null) : null;
         return $data;
     }
 
@@ -171,7 +171,7 @@ class UserQuery
     public function feedInfo(string $photoId) : ?object
     {
         $data = $this->query(API::LIVE_FEED_INFO . "{$this->principalId}&photoId={$photoId}");
-        $data = (isset($data->result) && ($data->result === 1)) ? ($data->currentWork ?? null) : null;
+        $data = self::verifyResult($data) ? ($data->currentWork ?? null) : null;
         return $data;
     }
 
@@ -341,7 +341,7 @@ class UserQuery
     public function cacheFeedsData() : JSON
     {
         $fileName = $this->fileName;
-        $this->setFileName('', 'FeedsData');
+        $this->setFileName($this->principalId, 'FeedsData');
         $json     = $this->save($this->feedsData);
         $this->setFileName('', $fileName);
         return $json;
@@ -360,16 +360,20 @@ class UserQuery
         if(empty($list)) {
             return false;
         }
+        $this->feedsData = ['list' => $list];
+        $this->cacheFeedsData();
 
         $savePath = $this->getFilePath();
         $_ = null;
 
-        foreach($list as $feed) {
+        foreach($list as $k => $feed) {
+            $feed         = (array) $feed;
             $downloadList = [];
             $type         = $feed['workType'];
             switch($type) {
                 case 'single':
                 case 'multiple':
+                case 'vertical':
                     $type = '图片';
                     $downloadList = $feed['imgUrls'];
                 break;
@@ -379,13 +383,17 @@ class UserQuery
                     $downloadList = [$feed['playUrl']];
                 break;
             }
-            $this->getLogger()->info(Kuai::LOG_PREFIX . '作品类型: ' . $type .  '; 即将下载(ID=' . $feed['id'] . ')......');
-            $_savePath = $savePath . $feed['id'] . DIRECTORY_SEPARATOR;
+            ++$k;
+            $this->getLogger()->info(Kuai::LOG_PREFIX . "[No. {$k}] 作品类型: {$type}; 即将下载(ID=" . $feed['id'] . ')......');
+            $_savePath = $savePath . $this->principalId . DIRECTORY_SEPARATOR . $feed['id'] . DIRECTORY_SEPARATOR;
             foreach($downloadList as $item) {
-                $this->module->download(str_replace('.webp', '.jpg', $item), $_savePath);
+                $__ = $this->module->download(str_replace('.webp', '.jpg', $item), $_savePath);
+                $_  = is_null($_) ? $__ : $_ && $__;
+                // 随机暂停进程
+                usleep(mt_rand(1000, 5000));
             }
         }
-        \owo\open($savePath);
+        \owo\open($savePath . $this->principalId);
 
         $this->getCache()->set('downloadStatus' , ($_ === true));
         return $_ ?? false;

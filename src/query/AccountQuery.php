@@ -11,7 +11,7 @@
  * @Author       : HanskiJay
  * @Date         : 2023-02-22 16:14:31
  * @LastEditors  : HanskiJay
- * @LastEditTime : 2023-02-23 20:29:15
+ * @LastEditTime : 2023-02-24 21:06:29
  * @E-Mail       : support@owoblog.com
  * @Telegram     : https://t.me/HanskiJay
  * @GitHub       : https://github.com/Tommy131
@@ -99,7 +99,7 @@ class AccountQuery
      *
      * @var array
      */
-    protected $header = API::DEFAULT_HEADER;
+    protected $header = Curl::DEFAULT_HEADER;
 
     /**
      * 请求的Cookies
@@ -180,10 +180,10 @@ class AccountQuery
     /**
      * 写入二维码到文件
      *
-     * @param  string  $stream
-     * @return AccountQuery
+     * @param  string $stream
+     * @return string 返回二维码所在目录
      */
-    private function putQrCode(string $stream) : AccountQuery
+    private function putQrCode(string $stream) : string
     {
         $path = Kuai::defaultStoragePath('tmp_login_QRCode.png');
         if(file_put_contents($path, base64_decode($stream)) !== false) {
@@ -195,19 +195,7 @@ class AccountQuery
         } else {
             $this->getLogger()->error(Kuai::LOG_PREFIX . '二维码保存失败!');
         }
-        return $this;
-    }
-
-    /**
-     * 验证请求结果是否有效
-     *
-     * @param  object|null $obj
-     * @param  integer $code
-     * @return boolean
-     */
-    public static function verifyResult(?object $obj, int $code = 1) : bool
-    {
-        return is_object($obj) && ((isset($obj->result) && ($obj->result === $code)) || (isset($obj->data->result) && ($obj->data->result === $code)));
+        return $path;
     }
 
     /**
@@ -247,7 +235,7 @@ class AccountQuery
         $sid = $_->sid;
 
         // 展开数组并且解析数据
-        $this->putQrCode($_->imageData);
+        $path = $this->putQrCode($_->imageData);
         $this->getLogger()->info(Kuai::LOG_PREFIX . "当前Token: §2qrLoginToken=§6{$_->qrLoginToken}§w|§2qrLoginSignature=§6{$_->qrLoginSignature}");
 
         // 处理扫描二维码请求
@@ -365,6 +353,7 @@ class AccountQuery
         $this->module->config()->set('cookies.' . $platform, $cookiesStr);
         $this->module->config()->save();
         $this->getLogger()->success("已成功更新本地Cookies! §wPlatform: {$platform}");
+        unlink($path);
         return true;
     }
 

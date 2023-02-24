@@ -60,7 +60,7 @@ class KuaiCommand extends CommandBase
 
 		// ~ 自动下载作品选项
 		$autoDownload = array_search('--autoDownload', $params);
-		$autoDownload = !$autoDownload ? array_search('--ad', $params) : false;
+		$autoDownload = ($autoDownload === false) ? array_search('--ad', $params) : false;
 		if($autoDownload !== false) {
 			unset($params[$autoDownload]);
 			$params = array_values($params);
@@ -177,11 +177,16 @@ class KuaiCommand extends CommandBase
 
                     // 解析分享ID识别平台
                     $shareMode = array_search('--mode-pc', $params);
-                    $shareMode = $shareMode ? ShareIdQuery::MODE_PC : array_search('--mode-mobile', $params);
-                    $shareMode = $shareMode ? ShareIdQuery::MODE_MOBILE : null;
+                    $shareMode = ($shareMode !== false) ? ShareIdQuery::MODE_PC : array_search('--mode-mobile', $params);
+                    $shareMode = ($shareMode !== false) ? $shareMode : ShareIdQuery::MODE_MOBILE;
+
+                    if($shareMode === ShareIdQuery::MODE_PC) {
+                        $this->getLogger()->error(Kuai::LOG_PREFIX . '[0x011] 暂时停止PC端分享解析.');
+                        return true;
+                    }
 
                     // 创建分享ID实例
-                    $shareIdQuery = new ShareIdQuery($this->module, $shareId, $shareMode ?? ShareIdQuery::MODE_MOBILE);
+                    $shareIdQuery = new ShareIdQuery($this->module, $shareId, $shareMode);
                     $shareIdQuery->query($noCache);
 
                     if(!empty($shareIdQuery->getData())) {
@@ -191,7 +196,7 @@ class KuaiCommand extends CommandBase
                             $shareIdQuery->download();
                         }
                     } else {
-                        $this->getLogger()->error(Kuai::LOG_PREFIX . '[0x011] 无法解析该分享ID.');
+                        $this->getLogger()->error(Kuai::LOG_PREFIX . '[0x012] 无法解析该分享ID.');
                     }
 				}
             break;
