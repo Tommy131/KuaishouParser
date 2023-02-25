@@ -23,6 +23,7 @@ namespace module\kuai;
 
 use module\kuai\KuaishouParser as Kuai;
 use module\kuai\query\AccountQuery;
+use module\kuai\query\API;
 use module\kuai\query\ShareIdQuery;
 use module\kuai\query\UserQuery;
 use owoframe\console\CommandBase;
@@ -202,8 +203,28 @@ class KuaiCommand extends CommandBase
             break;
 
             case 'login':
-                $this->getLogger()->info(Kuai::LOG_PREFIX . '准备登录请求......');
-                $query = new AccountQuery($this->module);
+                // 识别登录平台
+                $platform = array_shift($params);
+                switch($platform) {
+                    default:
+                    case '0':
+                    case 'live':
+                    case '-live':
+                    case '-l':
+                        $platform = 0;
+                    break;
+
+                    case '1':
+                    case 'www':
+                    case '-www':
+                    case '-w':
+                        $platform = 1;
+                    break;
+                }
+
+                $platformStr = API::shortPlatformName($platform);
+                $this->getLogger()->info(Kuai::LOG_PREFIX . "准备登录请求 [Platform: {$platformStr} ({$platform})]......");
+                $query = new AccountQuery($this->module, $platform);
                 if(!$query->login($errorMessage)) {
                     $this->getLogger()->error($errorMessage);
                 }

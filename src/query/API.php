@@ -11,7 +11,7 @@
  * @Author       : HanskiJay
  * @Date         : 2023-02-21 17:44:59
  * @LastEditors  : HanskiJay
- * @LastEditTime : 2023-02-23 04:19:39
+ * @LastEditTime : 2023-02-25 01:18:56
  * @E-Mail       : support@owoblog.com
  * @Telegram     : https://t.me/HanskiJay
  * @GitHub       : https://github.com/Tommy131
@@ -100,13 +100,22 @@ class API
 	 * 站点 'www.kuaishou.com' 的数据接口
 	 *
 	 */
-	// public const WWW = 'https://www.kuaishou.com/graphql';
+	public const WWW = 'https://www.kuaishou.com/graphql';
 
 	/**
-	 * 获取 `web_ph` 值的请求接口 (需要基于登录成功的状态下)
+	 * 获取 `kuaishou.server.web_st` 值的请求接口
+	 *
+	 * @param callback
+	 * @param _loginPage
+	 * @param sid
+	 */
+	public const WWW_PASS_TOKEN_REQUEST = 'https://id.kuaishou.com/pass/kuaishou/login/passToken?';
+
+	/**
+	 * 获取完整 Cookies 值的请求接口
 	 *
 	 */
-	// public const WWW_WEB_PH_REQUEST = 'https://www.kuaishou.com/rest/infra/sts';
+	public const WWW_COOKIES_REQUEST = 'https://www.kuaishou.com/rest/infra/sts';
 
 	/**
 	 * 分享ID的数据请求接口

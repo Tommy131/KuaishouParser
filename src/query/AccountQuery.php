@@ -11,7 +11,7 @@
  * @Author       : HanskiJay
  * @Date         : 2023-02-22 16:14:31
  * @LastEditors  : HanskiJay
- * @LastEditTime : 2023-02-24 21:06:29
+ * @LastEditTime : 2023-02-25 02:23:15
  * @E-Mail       : support@owoblog.com
  * @Telegram     : https://t.me/HanskiJay
  * @GitHub       : https://github.com/Tommy131
@@ -271,7 +271,7 @@ class AccountQuery
         $version  = Kuai::VERSION;
         \owo\output(PHP_EOL);
         $this->getLogger()->info(Kuai::LOG_PREFIX . "欢迎使用 KuaishouParser v{$version}!");
-        $this->getLogger()->info(Kuai::LOG_PREFIX . 'GitHub: https://github.com/Tommy131/Kuai');
+        $this->getLogger()->info(Kuai::LOG_PREFIX . 'GitHub: https://github.com/Tommy131/KuaishouParser');
         $this->getLogger()->info(Kuai::LOG_PREFIX . "如果本程序有帮到你, 请给此项目一个Star以鼓励我继续开发 :)");
         $this->getLogger()->success(Kuai::LOG_PREFIX . "扫码成功! 欢迎你, §6{$userName} §w[§3eid:§7{$eid}§w]§5!");
         \owo\output(PHP_EOL);
@@ -309,30 +309,63 @@ class AccountQuery
         $web_ph_tag = $_tag .'web_ph';
         $userId     = $_tmpData['userId'];
         $authToken  = $_tmpData[$web_at_tag];
-        // $web_st = $_tmpData[$web_st_tag];
-
         $this->cookies['userId'] = $userId;
-        // $this->cookies[$web_st_tag] = $web_st;
 
         // ~ 请求登录
-        $curl = $this->request(self::LOGIN)
-        // ->setUrl(self::APIS[self::LOGIN] . "authToken={$authToken}&sid={$sid}")
-        ->setPostData([
-            'userLoginInfo' =>
-            [
-                'authToken' => $authToken,
-                'sid'       => $sid
-            ]
-        ], true)
-        ->setContentType('application/json')
-        ->returnHeader()
-        ->exec();
+        switch($this->platform) {
+            default:
+            case API::TAG_LIVE:
+                $curl = $this->request(self::LOGIN)
+                // ->setUrl(self::APIS[self::LOGIN] . "authToken={$authToken}&sid={$sid}")
+                ->setPostData([
+                    'userLoginInfo' =>
+                    [
+                        'authToken' => $authToken,
+                        'sid'       => $sid
+                    ]
+                ], true)
+                ->setContentType('application/json')
+                ->returnHeader()
+                ->exec();
+            break;
+
+            case API::TAG_WWW:
+                // 创建用于GET请求的回调地址
+                $baseUrl    = 'https://passport.kuaishou.com/pc/account/passToken/result?successful=false&id=SSO_1677281430171&for=';
+                $nextUrl    = urlencode($baseUrl . 'passTokenSuccess');
+                $finalUrl   = API::WWW_COOKIES_REQUEST . "?followUrl={$nextUrl}&failUrl={$nextUrl}&setRootDomain=false";
+                $callback   = urlencode($finalUrl);
+                $_loginPage = urlencode($baseUrl . 'pullTokenFail');
+                // 写入Cookies
+                $this->cookies['passToken'] = $_tmpData['passToken'];
+                $this->cookies[$web_ph_tag] = md5(microtime());
+                // 开始请求
+                $curl = $this->request(self::EMPTY)
+                ->setUrl(API::WWW_PASS_TOKEN_REQUEST . "callback={$callback}&_loginPage={$_loginPage}&sid={$sid}")
+                ->returnHeader()
+                ->exec();
+                $_ = $curl->decodeWithJson();
+                // 判断是否存在请求结果
+                if(!self::verifyResult($_)) {
+                    $errorMessage = '[0x005] 请求失败, 请稍后重试!';
+                    return false;
+                }
+                unset($this->cookies['passToken']);
+
+                $this->cookies[$web_st_tag] = $_tmpData[$web_st_tag];
+                // 开始请求
+                $curl = $this->request(self::EMPTY)
+                ->setUrl($_->redirectUrl)
+                ->returnHeader()
+                ->exec();
+            break;
+        }
         $_ = $curl->decodeWithJson();
         // var_dump($_);
 
         // 判断是否存在请求结果
         if(!self::verifyResult($_)) {
-            $errorMessage = '[0x005] 登录出错!';
+            $errorMessage = '[0x006] 登录出错!';
             return false;
         }
 
