@@ -49,6 +49,13 @@ trait QueryTrait
      */
     protected $fileName = null;
 
+    /**
+     * 无缓存请求
+     *
+     * @var boolean
+     */
+    protected $noCache = false;
+
 
     /**
      * 设置主模块实例
@@ -71,6 +78,17 @@ trait QueryTrait
     {
         $this->filePath = $first . DIRECTORY_SEPARATOR;
         $this->fileName = $second;
+    }
+
+    /**
+     * 无缓存请求模式
+     *
+     * @param  boolean $_
+     * @return void
+     */
+    public function noCache(bool $_ = false) : void
+    {
+        $this->noCache = $_;
     }
 
     /**

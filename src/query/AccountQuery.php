@@ -11,7 +11,7 @@
  * @Author       : HanskiJay
  * @Date         : 2023-02-22 16:14:31
  * @LastEditors  : HanskiJay
- * @LastEditTime : 2023-02-25 02:23:15
+ * @LastEditTime : 2023-02-28 15:03:44
  * @E-Mail       : support@owoblog.com
  * @Telegram     : https://t.me/HanskiJay
  * @GitHub       : https://github.com/Tommy131
@@ -398,7 +398,7 @@ class AccountQuery
     public function logout() : bool
     {
         $platform = API::shortPlatformName($this->platform);
-        $sid      = ['sid' => API::PLATFORMS[$platform]];
+        $sid      = ['sid' => API::PLATFORMS[$this->platform]];
         $cookie   = $this->module->cookie($this->platform);
 
         // 从平台登出

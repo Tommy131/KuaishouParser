@@ -11,7 +11,7 @@
  * @Author       : HanskiJay
  * @Date         : 2023-02-22 02:55:56
  * @LastEditors  : HanskiJay
- * @LastEditTime : 2023-02-24 23:24:54
+ * @LastEditTime : 2023-02-28 16:10:17
  * @E-Mail       : support@owoblog.com
  * @Telegram     : https://t.me/HanskiJay
  * @GitHub       : https://github.com/Tommy131
@@ -161,14 +161,21 @@ class UserQuery
     /**
      * 获取用户所有作品信息
      *
-     * @param  string     $pcursor
-     * @param  integer    $count
+     * @param  integer     $count
+     * @param  string|null $pcursor
      * @return array|null
      */
-    public function getFeeds(string $pcursor = '', int $count = 1200) : ?array
+    public function getFeeds(int $count, ?string &$pcursor = null) : ?array
     {
-        $data = $this->query(API::LIVE_GET_FEEDS . "{$this->encodePrincipalId()}&pcursor={$pcursor}&count={$count}");
-        $data = self::verifyResult($data) ? ($data->list ?? null) : null;
+        $data    = $this->query(API::LIVE_GET_FEEDS . "{$this->encodePrincipalId()}&pcursor={$pcursor}&count={$count}");
+        $pcursor = $data->pcursor ?? null;var_dump($pcursor);
+        $data    = self::verifyResult($data) ? ($data->list ?? null) : null;
+        if(($pcursor !== null) && ($pcursor !== 'no_more') && ($pcursor !== '')) {
+            $data = array_merge($data, $this->getFeeds($count, $pcursor) ?? []);
+            $this->getLogger()->info(Kuai::LOG_PREFIX . '正在获取进阶数据: ' . $pcursor);
+            // 随机暂停进程
+            usleep(mt_rand(5000, 10000));
+        }
         return $data;
     }
 
@@ -248,9 +255,9 @@ class UserQuery
      *
      * @return UserQuery
      */
-    public function showSensitiveInfo(bool $update = false) : UserQuery
+    public function showSensitiveInfo() : UserQuery
     {
-        if(is_file($this->getCacheFile()) && !$update && ($this->getCache()->length() > 2)) {
+        if(is_file($this->getCacheFile()) && !$this->noCache && ($this->getCache()->length() > 2)) {
             $info = $this->getCache()->setObjectMode(true);
             $info->reload();
             $info   = $info->obj();
@@ -362,14 +369,14 @@ class UserQuery
      *
      * @return boolean
      */
-    public function download() : bool
+    public function download(?int $count = null) : bool
     {
         if(!is_file($this->getCacheFile())) {
             return false;
         }
         $this->setFileName($this->principalId, 'FeedsData');
         $data = $this->getCache(true);
-        $list = ($data->length() > 0) ? $data->get('list') : $this->getFeeds();
+        $list = !$this->noCache ? (($data->length() > 0) ? $data->get('list') : []) : $this->getFeeds($count ?? 1200);
         if(empty($list)) {
             return false;
         }
@@ -402,8 +409,6 @@ class UserQuery
             foreach($downloadList as $item) {
                 $__ = $this->module->download(str_replace('.webp', '.jpg', $item), $_savePath);
                 $_  = is_null($_) ? $__ : $_ && $__;
-                // 随机暂停进程
-                usleep(mt_rand(1000, 5000));
             }
         }
         \owo\open($savePath . $this->principalId);

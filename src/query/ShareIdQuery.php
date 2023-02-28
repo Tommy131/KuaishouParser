@@ -145,12 +145,11 @@ class ShareIdQuery
     /**
      * 发送请求
      *
-     * @param  boolean      $update
      * @return ShareIdQuery
      */
-    public function query(bool $update = false) : ShareIdQuery
+    public function query() : ShareIdQuery
     {
-        if($update || !self::cache()->exists($this->shareId))
+        if($this->noCache || !self::cache()->exists($this->shareId))
         {
             $this->curl()->returnHeader(true)->setUrl(self::LINK[$this->mode] . $this->shareId)->exec()->getContent($result);
             if(!$result || !preg_match('/^Location: (.*)$/imU', $result, $result)) {

@@ -11,7 +11,7 @@
  * @Author       : HanskiJay
  * @Date         : 2023-02-21 00:28:00
  * @LastEditors  : HanskiJay
- * @LastEditTime : 2023-02-24 00:27:17
+ * @LastEditTime : 2023-02-28 15:28:51
  * @E-Mail       : support@owoblog.com
  * @Telegram     : https://t.me/HanskiJay
  * @GitHub       : https://github.com/Tommy131
@@ -102,10 +102,13 @@ class KuaiCommand extends CommandBase
         Kuai::LOG_PREFIX . "正在查询用户 §3{$userId} §w......", PHP_EOL);
 
         $query = new UserQuery($this->module, $userId);
+        $query->noCache($noCache);
         $query->showSensitiveInfo();
         if($autoDownload) {
-            if(!$query->download()) {
-                $this->getLogger()->error(Kuai::LOG_PREFIX . '下载失败! 请尝试更新Cookies或使用代理服务器下载. 响应代码: ' . $query->result);
+            $count = (int) array_shift($params);
+            $count = ($count === 0) ? null : $count;
+            if(!$query->download($count)) {
+                $this->getLogger()->error(Kuai::LOG_PREFIX . '(部分) 下载失败! 请尝试更新Cookies或使用代理服务器下载. 响应代码: ' . $query->result);
             }
         }
         return true;
@@ -129,6 +132,17 @@ class KuaiCommand extends CommandBase
 				$isExecuted = false;
 			break;
 
+            case '-o':
+            case 'open':
+		        $name = array_shift($params);
+                $path = Kuai::defaultStoragePath($name);
+                if(!file_exists($path)) {
+                    $this->getLogger()->error(Kuai::LOG_PREFIX . "文件/文件夹 '{$path}' 未找到!");
+                }
+                \owo\open($path);
+                $this->getLogger()->info(Kuai::LOG_PREFIX . "已打开文件/文件夹 '{$path}'.");
+            break;
+
 			case '-s':
             case '-search':
 		        $userId = array_shift($params);
@@ -140,6 +154,7 @@ class KuaiCommand extends CommandBase
 
                 $this->getLogger()->info("正在搜索用户关键词: §3{$userId} §w| 页面: §3{$page}");
                 $query  = new UserQuery($this->module, $userId);
+                $query->noCache($noCache);
                 $query->showSearchResult((int) $page);
             break;
 
@@ -155,7 +170,7 @@ class KuaiCommand extends CommandBase
                         $first = 'shareIds';
                     break;
                 }
-                $path  = Kuai::defaultStoragePath("{$first}/{$next}");
+                $path = Kuai::defaultStoragePath("{$first}/{$next}");
 
                 if(!file_exists($path)) {
                     $this->getLogger()->error(Kuai::LOG_PREFIX . "文件 '{$path}' 未找到!");
@@ -188,6 +203,7 @@ class KuaiCommand extends CommandBase
 
                     // 创建分享ID实例
                     $shareIdQuery = new ShareIdQuery($this->module, $shareId, $shareMode);
+                    $shareIdQuery->noCache($noCache);
                     $shareIdQuery->query($noCache);
 
                     if(!empty($shareIdQuery->getData())) {
@@ -281,7 +297,7 @@ class KuaiCommand extends CommandBase
         return parent::getUsage() . implode(PHP_EOL, [
             '§3 [...parameters]§w',
             $space . \owo\str_fill_length('§3[userId]', $fillLength) .  '§w精确查询用户',
-            $space . \owo\str_fill_length('-search §3[userId]', $fillLength) .  '§w模糊查询用户',
+            $space . \owo\str_fill_length('-search | -s §3[userId]', $fillLength) .  '§w模糊查询用户',
             $space . \owo\str_fill_length('-d | -delete | §3[name] §r(nextName)', $fillLength + 3) .  '§w删除下载目录下的指定文件/文件夹, 可以是组合形式 (e.g. shareIds id)',
             $space . \owo\str_fill_length('-sid | -shareId | §3[shareId]', $fillLength) .  '§w作品分享ID',
             $space . \owo\str_fill_length('§5--autoDownload §w| §5--ad', $fillLength + 6) . '§w(全局) 自动下载作品',

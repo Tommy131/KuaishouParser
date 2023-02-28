@@ -99,6 +99,12 @@ The command is: `owo kuai -login (platform: string)`
 - Follow the prompts! As shown below:
 ![Login operation](.repo/img/tested_web_login.png)
 
+#### 4.6. Open Download Path (Only Windows)
+
+The command is: `owo kuai -o (name: string)`
+
+- By default, when the command is entered without parameters, it will open the resource download storage path, otherwise it will look for the file/folder name related to the parameter `name`
+
 ## Features
 
 - [x] Support simulating QR-Code scanning login to actively obtain cookies

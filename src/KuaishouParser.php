@@ -173,13 +173,14 @@ class KuaishouParser extends ModuleBase
 			return false;
 		}
 
-		if(is_file($outputPath . $saveName)) {
+        $outputPath .= $saveName;
+		if(\owo\check_file($outputPath)) {
 			$status = '文件已存在, 跳过下载.';
 			return true;
 		}
 		$_ = $this->curl()->setUrl($url)->exec()->getContent();
-		file_put_contents($outputPath . $saveName, $_);
-		return is_file($outputPath . $saveName);
+		file_put_contents($outputPath, $_);
+		return \owo\check_file($outputPath);
 	}
 
 	/**
