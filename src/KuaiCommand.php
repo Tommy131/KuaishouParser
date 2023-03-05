@@ -11,7 +11,7 @@
  * @Author       : HanskiJay
  * @Date         : 2023-02-21 00:28:00
  * @LastEditors  : HanskiJay
- * @LastEditTime : 2023-02-28 15:28:51
+ * @LastEditTime : 2023-03-05 13:11:11
  * @E-Mail       : support@owoblog.com
  * @Telegram     : https://t.me/HanskiJay
  * @GitHub       : https://github.com/Tommy131
@@ -169,6 +169,10 @@ class KuaiCommand extends CommandBase
                     case 'shareIds':
                         $first = 'shareIds';
                     break;
+
+                    case null:
+                        $this->getLogger()->error(Kuai::LOG_PREFIX . "错误的用法! 请给出指定文件名!");
+                    return true;
                 }
                 $path = Kuai::defaultStoragePath("{$first}/{$next}");
 
