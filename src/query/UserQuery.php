@@ -293,9 +293,9 @@ class UserQuery
         unset($info->verifiedStatus);
 
         // 创建识别直播状态的闭包函数
-        $isLiving  = fn(bool $_) => '§' . (($_) ? '5在线' : '1离线');
+        $isLiving  = fn(bool $_) => '§' . ($_ ? '5在线' : '1离线');
         // 创建识别隐私用户的闭包函数
-        $isPrivacy = fn(bool $_) => '§' . (($_) ? '5是' : '1否');
+        $isPrivacy = fn(bool $_) => '§' . ($_ ? '5是' : '1否');
 
         // 遍历数组
         $strings = $replace = [];
