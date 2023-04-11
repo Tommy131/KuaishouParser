@@ -11,7 +11,7 @@
  * @Author       : HanskiJay
  * @Date         : 2023-02-21 00:28:00
  * @LastEditors  : HanskiJay
- * @LastEditTime : 2023-03-05 13:11:11
+ * @LastEditTime : 2023-04-12 01:01:36
  * @E-Mail       : support@owoblog.com
  * @Telegram     : https://t.me/HanskiJay
  * @GitHub       : https://github.com/Tommy131
@@ -25,11 +25,16 @@ use module\kuai\KuaishouParser as Kuai;
 use module\kuai\query\AccountQuery;
 use module\kuai\query\API;
 use module\kuai\query\ShareIdQuery;
-use module\kuai\query\UserQuery;
+use module\kuai\query\LiveQuery;
+use module\kuai\query\WwwQuery;
 use owoframe\console\CommandBase;
 
 class KuaiCommand extends CommandBase
 {
+    /**
+     * 站点标识
+     */
+    public const STR_PLATFORM = ['live', 'www'];
 
     /**
      * 模块实例
@@ -37,6 +42,13 @@ class KuaiCommand extends CommandBase
      * @var KuaishouParser
      */
     private $module = null;
+
+    /**
+     * 快手站点
+     *
+     * @var integer
+     */
+    private $platform = 0;
 
 
     /**
@@ -71,7 +83,7 @@ class KuaiCommand extends CommandBase
 			$autoDownload = false;
 		}
 
-        // 检测是否获取最新数据
+        // ~ 检测是否获取最新数据
         $noCache = array_search('--no-cache', $params);
         if($noCache !== false) {
 			unset($params[$noCache]);
@@ -81,6 +93,17 @@ class KuaiCommand extends CommandBase
         } else {
             $noCache = false;
         }
+
+        // ~ 识别登录站点 (www)
+        $this->platform = array_search('--www', $params);
+		if($this->platform !== false) {
+			unset($params[$this->platform]);
+			$params = array_values($params);
+			$this->platform = 1;
+		} else {
+            $this->platform = 0;
+		}
+		$this->getLogger()->notice(Kuai::LOG_PREFIX . '已选择站点: ' . self::STR_PLATFORM[$this->platform]);
 
         // 解析参数
 		if($this->interceptParameters($params, $autoDownload, $noCache)) {
@@ -101,7 +124,13 @@ class KuaiCommand extends CommandBase
         Kuai::LOG_PREFIX . '登录后在浏览器控制台 (§6F12§w) 中输入 `§3document.cookie§w` 即可获取Cookie.',
         Kuai::LOG_PREFIX . "正在查询用户 §3{$userId} §w......", PHP_EOL);
 
-        $query = new UserQuery($this->module, $userId);
+        if(($this->platform === 1) && (strlen($userId) !== 15)) {
+            $this->getLogger()->error(Kuai::LOG_PREFIX . '用户ID长度有误! 在站点 `www` 下, 用户ID需为15位!');
+            return true;
+        }
+
+        $query = ($this->platform === 0) ? LiveQuery::class : WwwQuery::class;
+        $query = new $query($this->module, $userId);
         $query->noCache($noCache);
         $query->showSensitiveInfo();
         if($autoDownload) {
@@ -153,7 +182,8 @@ class KuaiCommand extends CommandBase
                 }
 
                 $this->getLogger()->info("正在搜索用户关键词: §3{$userId} §w| 页面: §3{$page}");
-                $query  = new UserQuery($this->module, $userId);
+                $query = ($this->platform === 0) ? LiveQuery::class : WwwQuery::class;
+                $query = new $query($this->module, $userId);
                 $query->noCache($noCache);
                 $query->showSearchResult((int) $page);
             break;
@@ -195,7 +225,7 @@ class KuaiCommand extends CommandBase
                 } else {
                     $this->getLogger()->info(Kuai::LOG_PREFIX . "正在解析分享作品ID: §3{$shareId} §w......");
 
-                    // 解析分享ID识别平台
+                    // 解析分享ID识别站点
                     $shareMode = array_search('--mode-pc', $params);
                     $shareMode = ($shareMode !== false) ? ShareIdQuery::MODE_PC : array_search('--mode-mobile', $params);
                     $shareMode = ($shareMode !== false) ? $shareMode : ShareIdQuery::MODE_MOBILE;
@@ -223,28 +253,9 @@ class KuaiCommand extends CommandBase
             break;
 
             case 'login':
-                // 识别登录平台
-                $platform = array_shift($params);
-                switch($platform) {
-                    default:
-                    case '0':
-                    case 'live':
-                    case '-live':
-                    case '-l':
-                        $platform = 0;
-                    break;
-
-                    case '1':
-                    case 'www':
-                    case '-www':
-                    case '-w':
-                        $platform = 1;
-                    break;
-                }
-
-                $platformStr = API::shortPlatformName($platform);
-                $this->getLogger()->info(Kuai::LOG_PREFIX . "准备登录请求 [Platform: {$platformStr} ({$platform})]......");
-                $query = new AccountQuery($this->module, $platform);
+                $platformStr = API::shortPlatformName($this->platform);
+                $this->getLogger()->info(Kuai::LOG_PREFIX . "准备登录请求 [Platform: {$platformStr} ({$this->platform})]......");
+                $query = new AccountQuery($this->module, $this->platform);
                 if(!$query->login($errorMessage)) {
                     $this->getLogger()->error($errorMessage);
                 }

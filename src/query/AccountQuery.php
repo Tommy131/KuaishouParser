@@ -88,7 +88,7 @@ class AccountQuery
     ];
 
     /**
-     * 登录平台
+     * 登录站点
      *
      * @var integer
      */
@@ -122,7 +122,7 @@ class AccountQuery
     }
 
     /**
-     * 返回平台类型
+     * 返回站点类型
      *
      * @return integer
      */
@@ -132,7 +132,7 @@ class AccountQuery
     }
 
     /**
-     * 设置登录平台
+     * 设置登录站点
      *
      * @param  integer    $platform
      * @return AccountQuery
@@ -401,7 +401,7 @@ class AccountQuery
         $sid      = ['sid' => API::PLATFORMS[$this->platform]];
         $cookie   = $this->module->cookie($this->platform);
 
-        // 从平台登出
+        // 从站点登出
         $curl = $this->request(self::LOGOUT)
         ->setPostData($sid)
         ->returnHeader(true)
