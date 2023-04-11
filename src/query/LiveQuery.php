@@ -11,7 +11,7 @@
  * @Author       : HanskiJay
  * @Date         : 2023-02-22 02:55:56
  * @LastEditors  : HanskiJay
- * @LastEditTime : 2023-02-28 16:10:17
+ * @LastEditTime : 2023-04-12 00:55:31
  * @E-Mail       : support@owoblog.com
  * @Telegram     : https://t.me/HanskiJay
  * @GitHub       : https://github.com/Tommy131
@@ -25,73 +25,9 @@ use module\kuai\KuaishouParser as Kuai;
 use owoframe\http\Curl;
 use owoframe\object\JSON;
 
-class UserQuery
+class LiveQuery extends QueryAbstract
 {
     use QueryTrait;
-
-    /**
-     * 用户ID
-     *
-     * @var string
-     */
-    protected $principalId;
-
-    /**
-     * 用户数据
-     *
-     * @var array
-     */
-    protected $userData = [];
-
-    /**
-     * 用户作品数据
-     *
-     * @var array
-     */
-    protected $feedsData = [];
-
-    /**
-     * 请求快手API的响应代码
-     *
-     * @var integer
-     */
-    public $result = 0;
-
-
-    /**
-     * 构造方法
-     *
-     * @param  Kuai        $module
-     * @param  string|null $principalId
-     */
-    public function __construct(Kuai $module, ?string $principalId = null)
-    {
-        $this->setModule($module);
-        $this->setPrincipalId($principalId);
-    }
-
-    /**
-     * 设置用户名称
-     *
-     * @param  string    $principalId
-     * @return UserQuery
-     */
-    public function setPrincipalId(string $principalId) : UserQuery
-    {
-        $this->principalId = $principalId;
-        $this->setFileName($principalId, $principalId);
-        return $this;
-    }
-
-    /**
-     * 将用户ID编码 (防止中文乱码)
-     *
-     * @return string
-     */
-    public function encodePrincipalId() : string
-    {
-        return urlencode($this->principalId);
-    }
 
     /**
      * Curl请求实例
@@ -171,8 +107,8 @@ class UserQuery
         $pcursor = $data->pcursor ?? null;var_dump($pcursor);
         $data    = self::verifyResult($data) ? ($data->list ?? null) : null;
         if(($pcursor !== null) && ($pcursor !== 'no_more') && ($pcursor !== '')) {
-            $data = array_merge($data, $this->getFeeds($count, $pcursor) ?? []);
             $this->getLogger()->info(Kuai::LOG_PREFIX . '正在获取进阶数据: ' . $pcursor);
+            $data = array_merge($data, $this->getFeeds($count, $pcursor) ?? []);
             // 随机暂停进程
             usleep(mt_rand(5000, 10000));
         }
@@ -196,9 +132,9 @@ class UserQuery
      * 返回用户模糊搜索结果
      *
      * @param  integer   $page
-     * @return UserQuery
+     * @return LiveQuery
      */
-    public function showSearchResult(int $page = 1) : UserQuery
+    public function showSearchResult(int $page = 1) : LiveQuery
     {
         $list = $this->search($page);
         if(!$list) {
@@ -222,18 +158,6 @@ class UserQuery
     }
 
     /**
-     * 创建性别转中文的闭包函数
-     *
-     * @param  string  $gender
-     * @param  integer $mode
-     * @return string
-     */
-    public static function getGender(string $gender, int $mode = 0) : string
-    {
-        return '§' . (($mode === 0) ? (($gender === 'M') ? '7男' : '1女') : (($gender === 'M') ? '7他' : '1她'));
-    }
-
-    /**
      * 用户模板输出
      *
      * @return string
@@ -253,17 +177,17 @@ class UserQuery
     /**
      * 返回完整用户数据
      *
-     * @return UserQuery
+     * @return LiveQuery
      */
-    public function showSensitiveInfo() : UserQuery
+    public function showSensitiveInfo() : LiveQuery
     {
         if(is_file($this->getCacheFile()) && !$this->noCache && ($this->getCache()->length() > 2)) {
             $info = $this->getCache()->setObjectMode(true);
             $info->reload();
             $info   = $info->obj();
-            $cached = ($info->isCached ?? false) ? '[已缓存] 时间: ' . $info->cachedTime . PHP_EOL : '';
+            $cached = ($info->isCached ?? false) ? ('[已缓存] 时间: ' . $info->cachedTime . PHP_EOL) : '';
         } else {
-            $info = $this->sensitiveInfo($this->principalId);
+            $info = $this->sensitiveInfo();
             if($info) {
                 unset($info->timestamp);
                 $this->userData = (array) $info;
@@ -279,7 +203,7 @@ class UserQuery
         $template   = ($cached ?? '') . self::getUserOutputTemplate();
         $fillLength = \owo\str_length($this->principalId);
 
-        // 先替换最后一行
+        // 替换用户粉丝数据
         foreach($info->counts as $k => $v) {
             $strings[] = "{{$k}}";
             $replace[] = \owo\str_fill_length((string) $v, $fillLength);
@@ -331,40 +255,6 @@ class UserQuery
     }
 
     /**
-     * 返回文件路径
-     *
-     * @return string
-     */
-    public function getFilePath() : string
-    {
-        return Kuai::defaultStoragePath($this->filePath, true);
-    }
-
-    /**
-     * 缓存用户数据到本地
-     *
-     * @return JSON
-     */
-    public function cacheUserData() : JSON
-    {
-        return $this->save($this->userData);
-    }
-
-    /**
-     * 缓存用户作品数据到本地
-     *
-     * @return JSON
-     */
-    public function cacheFeedsData() : JSON
-    {
-        $fileName = $this->fileName;
-        $this->setFileName($this->principalId, 'FeedsData');
-        $json     = $this->save($this->feedsData);
-        $this->setFileName('', $fileName);
-        return $json;
-    }
-
-    /**
      * 下载用户作品
      *
      * @return boolean
@@ -383,7 +273,7 @@ class UserQuery
         $this->feedsData = ['list' => $list];
         $this->cacheFeedsData();
 
-        $savePath = $this->getFilePath();
+        $savePath = $this->getFilePath() . $this->principalId . DIRECTORY_SEPARATOR;
         $_ = null;
 
         foreach($list as $k => $feed) {
@@ -405,7 +295,7 @@ class UserQuery
             }
             ++$k;
             $this->getLogger()->info(Kuai::LOG_PREFIX . "[No. {$k}] 作品类型: {$type}; 即将下载(ID=" . $feed['id'] . ')......');
-            $_savePath = $savePath . $this->principalId . DIRECTORY_SEPARATOR . $feed['id'] . DIRECTORY_SEPARATOR;
+            $_savePath = $savePath . $feed['id'] . DIRECTORY_SEPARATOR;
             foreach($downloadList as $item) {
                 $__ = $this->module->download(str_replace('.webp', '.jpg', $item), $_savePath);
                 $_  = is_null($_) ? $__ : $_ && $__;
@@ -415,6 +305,30 @@ class UserQuery
 
         $this->getCache()->set('downloadStatus' , ($_ === true));
         return $_ ?? false;
+    }
+
+    /**
+     * 返回文件路径
+     *
+     * @return string
+     */
+    public function getFilePath() : string
+    {
+        return Kuai::defaultStoragePath($this->filePath, true);
+    }
+
+    /**
+     * 缓存用户作品数据到本地
+     *
+     * @return JSON
+     */
+    public function cacheFeedsData() : JSON
+    {
+        $fileName = $this->fileName;
+        $this->setFileName($this->principalId, 'FeedsData');
+        $json     = $this->save($this->feedsData);
+        $this->setFileName('', $fileName);
+        return $json;
     }
 }
 ?>
