@@ -1,7 +1,0 @@
-query SharePageQuery($principalId: String, $feedId: String) {
-  feedById(principalId: $principalId, photoId: $feedId) {
-    currentWork {
-      playUrl
-    }
-  }
-}

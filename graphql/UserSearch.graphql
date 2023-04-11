@@ -1,0 +1,23 @@
+query graphqlSearchUser($keyword: String, $pcursor: String, $searchSessionId: String) {
+  visionSearchUser(keyword: $keyword, pcursor: $pcursor, searchSessionId: $searchSessionId) {
+    result
+    users {
+      fansCount
+      photoCount
+      isFollowing
+      user_id
+      headurl
+      user_text
+      user_name
+      verified
+      verifiedDetail {
+        description
+        iconType
+        newVerified
+        musicCompany
+        type
+      }
+    }
+    pcursor
+  }
+}

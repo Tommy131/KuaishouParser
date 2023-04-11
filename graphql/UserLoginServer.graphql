@@ -1,9 +1,0 @@
-query userInfoQuery {
-  visionOwnerInfo {
-    id
-    name
-    avatar
-    eid
-    userId
-  }
-}

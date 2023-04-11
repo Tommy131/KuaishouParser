@@ -1,0 +1,36 @@
+fragment photoContent on PhotoEntity {
+  id
+  duration
+  caption
+  originCaption
+  likeCount
+  viewCount
+  realLikeCount
+  coverUrl
+  photoUrl
+  photoH265Url
+  timestamp
+  animatedCoverUrl
+  liked
+  profileUserTopPhoto
+}
+
+fragment feedContent on Feed {
+  photo {
+    ...photoContent
+  }
+  canAddComment
+  tags {
+    name
+  }
+}
+
+query visionProfilePhotoList($pcursor: String, $userId: String, $page: String, $webPageArea: String) {
+  visionProfilePhotoList(pcursor: $pcursor, userId: $userId, page: $page, webPageArea: $webPageArea) {
+    result
+    feeds {
+      ...feedContent
+    }
+    pcursor
+  }
+}
