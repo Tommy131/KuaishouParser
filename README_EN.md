@@ -17,7 +17,7 @@ Be sure to submit bugs or suggestions using the default Issue template provided!
 - [x] Support for parsing information of a single work
 - [x] Background logging to record recent parsing records
 - [x] Background log records and analyzes the details of the work (title, release time, likes, etc.)
-- [ ] Error list (i.e. request timeout and other works enter the error list, waiting for the next retry)
+- [x] Error list (i.e. request timeout and other works enter the error list, waiting for the next retry)
 - [ ] Stay tuned... Give more Stars to encourage me to develop!!! Please!!! This project really took me a lot of time to grasp the interface and optimize!!!
 
 ## How to use?
@@ -39,7 +39,7 @@ Please follow the steps below slowly.
 
 > Notice: Of course, you can also use the simulated login command below to obtain Cookies.
 
-### 3. Configuration file explanation
+### 2. Configuration file explanation
 
 - `www` in config.json corresponds to `www.kuaishou.com`, `live` corresponds to `live.kuaishou.com`.
 - The default configuration file is like as follows:
@@ -58,24 +58,28 @@ Please follow the steps below slowly.
 }
 ```
 
-### 4. Explanation for Commands
+### 3. Explanation for Commands
 
 The main command of this project is `owo kuai [arguments: string]`, the premise of default `php` is to run the command terminal in the root directory of the current project.  
-Global auto-download parameter: `--autoDownload` or `--ad` (any position for this parameter)
+Global Parameters (any position for this parameter):
 
-#### 4.1. Full analysis of author's works
+- Auto download: `--autoDownload` or `--ad`
+- No cache request: `--no-cache`
+- Platform: `--live` (<-default) or `--www`
+
+#### 3.1. Full analysis of author's works
 
 The command is: `owo kuai [authorId: string]`  
 
 - `authorId`: Author ID (the ID here can be the Kuaishou account displayed in the Kuaishou App, or the authorId in <https://(Kuishou>'s domain name)/profile/authorId)
 
-#### 4.2. User Search
+#### 3.2. User Search
 
 The command is: `owo kuai -search [userName: string]`  
 
 - `userName`: The name you want to search
 
-#### 4.3. Share Analysis
+#### 3.3. Share Analysis
 
 The command is: `owo kuai -s [id: string] (--mode-mobile)`
 
@@ -85,13 +89,13 @@ The command is: `owo kuai -s [id: string] (--mode-mobile)`
 - `--mode-pc`: Parse from web page
 - `--mode-mobile`: Parse from KuaiShou Mobile Client (default parsing platform is mobile client)
 
-#### 4.4. Delete Cache
+#### 3.3. Delete Cache
 
 Th command is: `owo kuai -d [fileName: string] [...string]`
 
 - `fileName`: the name in path `downloaded` (could be a dir or a file)
 
-#### 4.5. Simulate login (QR-Code)
+#### 3.5. Simulate login (QR-Code)
 
 The command is: `owo kuai -login (platform: string)`
 
@@ -99,7 +103,7 @@ The command is: `owo kuai -login (platform: string)`
 - Follow the prompts! As shown below:
 ![Login operation](.repo/img/tested_web_login.png)
 
-#### 4.6. Open Download Path (Only Windows)
+#### 3.6. Open Download Path (Only Windows)
 
 The command is: `owo kuai -o (name: string)`
 
