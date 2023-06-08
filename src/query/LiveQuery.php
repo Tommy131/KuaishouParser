@@ -11,7 +11,7 @@
  * @Author       : HanskiJay
  * @Date         : 2023-02-22 02:55:56
  * @LastEditors  : HanskiJay
- * @LastEditTime : 2023-04-12 00:55:31
+ * @LastEditTime : 2023-06-08 12:36:06
  * @E-Mail       : support@owoblog.com
  * @Telegram     : https://t.me/HanskiJay
  * @GitHub       : https://github.com/Tommy131
@@ -166,10 +166,10 @@ class LiveQuery extends QueryAbstract
     {
         $line = '--------------------------------------------------------------------------------' . PHP_EOL;
         return $line .
-        '用户ID: §3{id}  §w| 显示名称: §3{name}    §w| 原始ID: §3{originUserId} §w| 性别: {sex}§w' . PHP_EOL .
-        '直播状态: {living} §w| 关注状态: §3{followStatus}  §w| 星座: §3{constellation}    §w| 所在城市: §3{cityName}§w' . PHP_EOL .
+        '用户ID: §3{id}  §w| 原始ID: §3{originUserId}    §w| 性别: {sex}    §w| 显示名称: §3{name}§w' . PHP_EOL .
+        '粉丝数: §3{fan}  §w| 作品数: §3{photo}    §w| 关注数: §3{follow} §w| 直播回放: §3{playback}§w' . PHP_EOL .
+        '直播状态: {living} §w| 关注状态: §3{followStatus}  §w| 星座: §3{constellation}   §w| 所在城市: §3{cityName}§w' . PHP_EOL .
         '隐私用户: {privacy} §w| 个人简介: §5{description}§w' . PHP_EOL .
-        '粉丝数: §3{fan}  §w| 作品数: §3{photo}      §w| 关注数: §3{follow}  §w| 直播回放: §3{playback}§w' . PHP_EOL .
         '{verifiedStatus}' .
         $line;
     }

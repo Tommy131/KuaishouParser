@@ -38,7 +38,7 @@ class WwwQuery extends QueryAbstract
      */
     protected function request(string $template) : Graphql
     {
-        $template = $this->module->getLoadPath() . 'graphql' . DIRECTORY_SEPARATOR . "{$template}.graphql";
+        $template = $this->module->getLoadPath() . 'src' . DIRECTORY_SEPARATOR . 'graphql' . DIRECTORY_SEPARATOR . "{$template}.graphql";
         if(!file_exists($template)) {
             throw new Error("File '{$template}' was not found!");
         }
