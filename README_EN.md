@@ -1,11 +1,16 @@
 # KuaishouParser
 
-Open Source License: ![License](https://img.shields.io/badge/License-Apache%202.0-blue.svg) [Learn More](https://opensource.org/licenses/Apache-2.0)  
+Open Source License: ![License](https://img.shields.io/badge/License-Apache%202.0-blue.svg) [Learn More](https://opensource.org/licenses/Apache-2.0)
+
 Kuaishou short video batch download script
 
-This project uses `OwOFrame` for backend construction, which needs to be used together. Website: [Click me](https://github.com/Tommy131/OwOFrame)  
-This project is only used for learning and communication, and it is strictly prohibited to sell this source code!  
-Be sure to submit bugs or suggestions using the default Issue template provided!  
+This project uses `OwOFrame` for backend construction, which needs to be used together. Website: [Click me](https://github.com/Tommy131/OwOFrame)
+
+This project is only used for learning and communication, and it is strictly prohibited to sell this source code!
+
+Be sure to submit bugs or suggestions using the default Issue template provided!
+
+Donation: <https://owoblog.com/donation/>
 
 ## Goals
 

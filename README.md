@@ -1,11 +1,16 @@
 # KuaishouParser
 
-开源许可证: ![License](https://img.shields.io/badge/License-Apache%202.0-blue.svg) [Learn More](https://opensource.org/licenses/Apache-2.0)  
+开源许可证: ![License](https://img.shields.io/badge/License-Apache%202.0-blue.svg) [Learn More](https://opensource.org/licenses/Apache-2.0)
+
 快手短视频批量下载脚本
 
-此项目采用 `OwOFrame` 进行的后端构建, 需要配套使用. 项目地址: [点我](https://github.com/Tommy131/OwOFrame)  
-本项目仅用于学习交流等途径, 严禁贩卖此源码!  
-请务必采用默认提供的Issue模板提交BUG或建议!  
+此项目采用 `OwOFrame` 进行的后端构建, 需要配套使用. 项目地址: [点我](https://github.com/Tommy131/OwOFrame)
+
+本项目仅用于学习交流等途径, 严禁贩卖此源码!
+
+请务必采用默认提供的Issue模板提交BUG或建议!
+
+项目打赏/捐赠地址: <https://owoblog.com/donation/>
 
 [English version click here!](README_EN.md)
 
